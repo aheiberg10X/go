@@ -2,54 +2,80 @@
 #define STATE_H
 
 #include <set>
+#include <string>
 
 using namespace std;
 
-enum COLORS {
+enum COLOR {
     BLACK = -1,
     WHITE = 1,
     EMPTY = 0,
     OFFBOARD = -7
 };
 
+enum DIRECTION {
+    N = 0,
+    S = 1,
+    E = 2,
+    W = 3,
+    NW = 4,
+    NE = 5,
+    SW = 6,
+    SE = 7
+};
+
 class State {
     public :
         int dim;
+        int bigdim;
         int boardsize;
-        int* board;
+        COLOR* board;
 
         //straightforward to remove if need memory
         set<int> open_positions;
-        COLORS player;
+        COLOR player;
         //TODO: past states
         
         //ctor
         State ( int, bool );
         
         State copy();
-        int getNorth(int);
-        int getSouth(int);
-        int getEast(int);
-        int getWest(int);
-        int getNorthWest(int);
-        int getNorthEast(int);
-        int getSouthWest(int);
-        int getSouthEast(int);
+        string toString();
+
+        int neighbor(int ix, DIRECTION dir);
+        /*int getNorth(int);*/
+        /*int getSouth(int);*/
+        /*int getEast(int);*/
+        /*int getWest(int);*/
+        /*int getNorthWest(int);*/
+        /*int getNorthEast(int);*/
+        /*int getSouthWest(int);*/
+        /*int getSouthEast(int);*/
 
         int action2ix(int);
         int action2color(int);
         int ix2color(int);
 
-        void setBoard( int* ixs, int len, COLORS );
+        void setBoard( int* ixs, int len, COLOR );
 
         //Left off here
-        int* neighborsOf( int ix, int adjacency );
-        int* filterByColor( int ixs, COLORS* colors );
+        void neighborsOf( int ix, int adjacency );
+        void filterByColor( int* neighbors_array, 
+                            int adjacency,  
+                            COLOR* color_array, 
+                            int filter_len );
         int* floodFill( int ix, 
-                        COLORS* filter_colors,
-                        COLORS* stop_colors, 
+                        COLOR* color_array,
+                        COLOR* stop_colors, 
                         int adjacency );
-                                 
+
+        int neighbor_array[8];
+        int filtered_array[8];
+        int filtered_len;
+        COLOR color_array[3];
+
+        /*private :*/
+
 
 
 };
