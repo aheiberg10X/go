@@ -24,6 +24,8 @@ State::State( int dimension, bool shallow ){
     }
     player = BLACK;
 
+    floodfill_array = new int[boardsize];
+
 }
 
 State State::copy() {
@@ -99,50 +101,96 @@ void State::setBoard( int* ixs, int len, COLOR color ){
 }
 
 
-void State::neighborsOf( int ix, int adjacency ){
+void* State::neighborsOf( int* to_fill, int ix, int adjacency ){
     assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
-        neighbor_array[dir] = neighbor(ix, (DIRECTION) dir);
+        to_fill[dir] = neighbor(ix, (DIRECTION) dir);
     }
     //return neighbor_array;
 }
 
-void State::filterByColor( int* neighbor_array, 
+void State::filterByColor( int* to_fill, 
+                           int* to_fill_len,
+                           int* neighbor_array, 
                            int adjacency, 
                            COLOR* color_array,
                            int filter_len ){
 
-    filtered_len = 0;
-    int faix = 0;
+    *to_fill_len = 0;
+    int fillix = 0;
     COLOR color;
-    bool matched;
     for(int naix=0; naix<adjacency; naix++){
         color = board[neighbor_array[naix]];
-        //cout << "color of neighbor " << neighbor_array[naix] << " is: " << color << endl;
         for( int caix=0; caix<filter_len; caix++ ){
             if( color == color_array[caix] ){ 
-                //cout << "match!" << endl;
-                filtered_array[faix] = neighbor_array[naix];
-                filtered_len++;
+                to_fill[fillix] = neighbor_array[naix];
+                (*to_fill_len)++;
             }
         }
     }
-            //return filtered_array;
 }
 
-
-
 //TODO: incomplete
-//int* floodFill( int ix, 
-//COLOR* color_array, 
-//COLOR* stop_colors, 
-//int adjacency ){
-//set<int> marked;
-//queue<int> q;
-//while( !q.empty() ){
-//int ix = q.front();
-//q.pop();
-//marked.insert(ix);
-//neighbs = neighborsOf( ix, adjacency );
-//}
-//}
+void State::floodFill( int* to_fill,
+                       int* to_fill_len, 
+                       int epicenter_ix,
+                       int* neighbor_array,
+                       int adjacency,
+                       COLOR* filter_color_array, 
+                       int filter_len,
+                       COLOR* stop_color_array, 
+                       int stop_len ){
+
+    set<int> marked;
+    queue<int> q;
+    q.insert(epicenter_ix);
+
+    while( !q.empty() ){
+        int ix = q.front();
+        q.pop();
+        marked.insert(ix);
+
+        neighborsOf( neighbor_array, 
+                     ix, 
+                     adjacency );
+
+        //find if neighbors that are a cause to stop the flood fill
+        filterByColor( filterer_array,
+                       filtered_len,
+                       neighbor_array,
+                       adjacency,
+                       stop_color_array,
+                       stop_len);
+
+        bool stop_color_in_neighbs = &filtered_array > 0;
+        if( stop_color_in_neights ){
+            marked.clear();
+            break;
+        }
+        else {
+            //find connector neighbors
+            filterByColor( filtered_array, 
+                           filtered_len,
+                           neighbors_array,
+                           adjacency,
+                           filter_color_array,
+                           filter_len );
+            //see if connector neighbors are already in marked
+            //if not, add them
+            for( int faix=0; faix<&filtered_len; faix++ ){
+                int ix = filtered_array[faix];
+                if( marked.find( ix ) != marked::end ){
+                    q.insert(ix);
+                }
+            }
+        }
+    }
+    
+    //populate to_fill; kinda of unnecassay just did to keep pattern same
+    int i = 0;
+    for( int it=marked.begin(); it != marked.end(); i++ ){
+        to_fill[i++] = it;
+    }
+    *to_fill_len = i;
+
+}

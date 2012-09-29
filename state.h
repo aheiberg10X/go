@@ -43,14 +43,6 @@ class State {
         string toString();
 
         int neighbor(int ix, DIRECTION dir);
-        /*int getNorth(int);*/
-        /*int getSouth(int);*/
-        /*int getEast(int);*/
-        /*int getWest(int);*/
-        /*int getNorthWest(int);*/
-        /*int getNorthEast(int);*/
-        /*int getSouthWest(int);*/
-        /*int getSouthEast(int);*/
 
         int action2ix(int);
         int action2color(int);
@@ -58,20 +50,37 @@ class State {
 
         void setBoard( int* ixs, int len, COLOR );
 
-        //Left off here
-        void neighborsOf( int ix, int adjacency );
-        void filterByColor( int* neighbors_array, 
+        void* neighborsOf( int* to_fill,
+                           int ix, 
+                           int adjacency );
+
+        void filterByColor( int* to_fill,
+                            int* to_fill_len,
+                            int* neighbors_array, 
                             int adjacency,  
                             COLOR* color_array, 
                             int filter_len );
-        int* floodFill( int ix, 
+
+        void floodFill( int* to_fill,
+                        int* to_fill_len,
+                        int epicenter_ix,
+                        int* neighbor_array, 
+                        int adjacency, 
                         COLOR* color_array,
+                        int color_len,
                         COLOR* stop_colors, 
-                        int adjacency );
+                        int stop_len );
+
+        //TODO
+        //figure out if these static or member
+        int* floodfill_array;
+        int* floodfill_len;
 
         int neighbor_array[8];
+
         int filtered_array[8];
-        int filtered_len;
+        int* filtered_len;
+
         COLOR color_array[3];
 
         /*private :*/
