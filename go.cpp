@@ -1,11 +1,13 @@
 #include <iostream>
-#include "state.h"
+#include "gostate.h"
+#include "godomain.h"
 #include <assert.h>
 
 using namespace std;
 
 int main(){
-    State s( 5, false );
+    string name = "s";
+    GoState s( name, 5, false );
 
     const int l = 7;
     int is[l] = {1,1,2,2,3,4,1};
@@ -20,6 +22,22 @@ int main(){
     for( int i=0; i<ll; i++ ){
         s.setBoard( s.coord2ix( is2[i], js2[i] ), BLACK );
     }
+    
+    //name = "ps";
+    //GoState ps( name, 5, false );
+    //const int lll = 3;
+    //int is3[lll] = {1,2,3};
+    //int js3[lll] = {3,2,1};
+    //for( int i=0; i<lll; i++ ){
+    //ps.setBoard( ps.coord2ix( is3[i], js3[i] ), WHITE );
+    //}
+    //
+    //s.past_states[NUM_PAST_STATES-1] = &ps;
+
+    //GoState* s2 = s.copy(false);
+    //cout << s2->past_states[NUM_PAST_STATES-1]->toString();
+
+
 
     //int adjacency = 4;
     //s.color_array[0] = WHITE;
@@ -50,6 +68,8 @@ int main(){
     s.setBoard( s.coord2ix(2,1), WHITE );
     cout << s.toString() << endl;
     cout << "is suicide: " << s.isSuicide( s.coord2ix(2,1) ) << endl;
+
+    GoDomain gd();
 
 
     return 0;

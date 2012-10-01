@@ -1,13 +1,16 @@
 all: clean go
 
-go: go.o state.o
-	g++ go.o state.o -o go
+go: go.o gostate.o godomain.o
+	g++ go.o gostate.o godomain.o -o go
+
+godomain.o:
+	g++ -c godomain.cpp
 
 go.o:
 	g++ -c go.cpp
 
-state.o: 
-	g++ -c state.cpp
+gostate.o: 
+	g++ -c gostate.cpp
 
 clean:
 	rm -rf *.o go
