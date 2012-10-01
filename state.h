@@ -45,9 +45,13 @@ class State {
         int neighbor(int ix, DIRECTION dir);
 
         int action2ix(int);
-        int action2color(int);
+        COLOR action2color(int);
         int ix2color(int);
+        
+        int coord2ix( int i, int j );
+        string ix2coord( int ix );
 
+        void setBoard( int ix, COLOR color );
         void setBoard( int* ixs, int len, COLOR );
 
         void* neighborsOf( int* to_fill,
@@ -64,12 +68,15 @@ class State {
         void floodFill( int* to_fill,
                         int* to_fill_len,
                         int epicenter_ix,
-                        int* neighbor_array, 
+                        /*int* neighbor_array, */
                         int adjacency, 
                         COLOR* color_array,
                         int color_len,
                         COLOR* stop_colors, 
                         int stop_len );
+
+
+        bool isSuicide( int action );
 
         //TODO
         //figure out if these static or member
@@ -82,6 +89,7 @@ class State {
         int* filtered_len;
 
         COLOR color_array[3];
+        int* color_len;
 
         /*private :*/
 
