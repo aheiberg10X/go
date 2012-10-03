@@ -2,8 +2,7 @@
 #define GOSTATE_H
 
 #include <set>
-/*#include <string>*/
-#include "state.h"
+#include <string>
 
 using namespace std;
 
@@ -28,8 +27,9 @@ enum DIRECTION {
 
 const int NUM_PAST_STATES = 10;
 
-class GoState : public State {
+class GoState {
     public :
+        std::string name;
         int dim;
         int bigdim;
         int boardsize;
@@ -57,6 +57,7 @@ class GoState : public State {
         int    ix2color(int);
         int    coord2ix( int i, int j );
         string ix2coord( int ix );
+        bool isPass( int action );
 
         void setBoard( int ix, COLOR color );
         void setBoard( int* ixs, int len, COLOR );

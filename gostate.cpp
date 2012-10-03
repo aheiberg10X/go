@@ -128,6 +128,7 @@ int GoState::action2ix( int action ){
     return abs(action);
 }
 COLOR GoState::action2color( int action ){
+    assert( action != 0 );
     return (action > 0) ? WHITE : BLACK;
 }
 int GoState::ix2color( int ix ){
@@ -144,6 +145,10 @@ string GoState::ix2coord( int ix ){
     stringstream out;
     out << i << "," << j;
     return out.str();
+}
+
+bool GoState::isPass( int action ){
+    return action == 0;
 }
 
 void GoState::setBoard( int* ixs, int len, COLOR color ){
@@ -201,15 +206,16 @@ void GoState::floodFill( int* to_fill,
                        int* to_fill_len, 
                        int epicenter_ix,
                        int adjacency,
-                       COLOR* filter_color_array, 
+                       COLOR* flood_color_array, 
                        int filter_len,
                        COLOR* stop_color_array, 
                        int stop_len ){
+
     set<int> marked;
     queue<int> q;
     q.push(epicenter_ix);
 
-    int neighbs[8];
+    int neighbs[adjacency];
 
     while( !q.empty() ){
         int ix = q.front();
@@ -240,7 +246,7 @@ void GoState::floodFill( int* to_fill,
                            &filtered_len,
                            neighbs,
                            adjacency,
-                           filter_color_array,
+                           flood_color_array,
                            filter_len );
             //see if connector neighbors are already in marked
             //if not, add them

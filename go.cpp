@@ -1,6 +1,6 @@
-#include <iostream>
 #include "gostate.h"
-#include "godomain.h"
+#include <iostream>
+#include "godomain.cpp"
 #include <assert.h>
 
 using namespace std;
@@ -33,7 +33,7 @@ int main(){
     //}
     //
     //s.past_states[NUM_PAST_STATES-1] = &ps;
-
+    //
     //GoState* s2 = s.copy(false);
     //cout << s2->past_states[NUM_PAST_STATES-1]->toString();
 
