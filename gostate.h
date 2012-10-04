@@ -34,6 +34,8 @@ class GoState {
         int bigdim;
         int boardsize;
         COLOR* board;
+        int action;
+        bool shallow;
 
         //straightforward to remove if need memory
         set<int> open_positions;
@@ -43,10 +45,12 @@ class GoState {
         
         //ctor
         GoState ( string, int, bool );
+        ~GoState();
         
         GoState* copy(bool shallow);
         string toString();
 
+        COLOR flipColor( COLOR c );
         bool sameAs( COLOR* board, COLOR player );
         bool sameAs( GoState s );
 
@@ -58,6 +62,8 @@ class GoState {
         int    coord2ix( int i, int j );
         string ix2coord( int ix );
         bool isPass( int action );
+        int coordColor2Action( int i, int j, COLOR color );
+        int ixColor2Action( int ix, COLOR color );
 
         void setBoard( int ix, COLOR color );
         void setBoard( int* ixs, int len, COLOR );

@@ -15,7 +15,7 @@ class Domain {
 
         virtual void* copyState( void* state ) = 0;
 
-        virtual void applyAction( void* state, 
+        virtual bool applyAction( void* state, 
                                   int action,
                                   bool side_effects ) = 0;
 

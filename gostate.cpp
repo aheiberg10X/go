@@ -29,12 +29,28 @@ GoState::GoState( string name, int dimension, bool shallow ){
     floodfill_array = new int[boardsize];
 
     if( ! shallow ){
-       for( int i=0; i < NUM_PAST_STATES; i++ ){
-           stringstream ss;
-           ss << "ps" << i;
-           past_states[i] = new GoState( ss.str(), dim, true);
-       } 
+        shallow = false;
+        for( int i=0; i < NUM_PAST_STATES; i++ ){
+            stringstream ss;
+            ss << "ps" << i;
+            past_states[i] = new GoState( ss.str(), dim, true);
+        } 
     }
+    else{
+        shallow = true;
+    }
+}
+
+GoState::~GoState(){
+    delete board;
+    delete floodfill_array;
+    if( shallow ){
+        for( int i=0; i < NUM_PAST_STATES; i++ ){
+            delete past_states[i];
+        }
+    }
+    //TODO why does this cause such havoc?
+    //delete past_states;
 }
 
 GoState* GoState::copy( bool shallow ) {
@@ -58,6 +74,11 @@ GoState* GoState::copy( bool shallow ) {
     }
 
     return s;
+}
+
+COLOR GoState::flipColor( COLOR c ){
+    assert( c == WHITE || c == BLACK );
+    return (c == WHITE) ? BLACK : WHITE;
 }
 
 bool GoState::sameAs( COLOR* board, COLOR player ){
@@ -127,12 +148,25 @@ int GoState::neighbor(int ix, DIRECTION dir){
 int GoState::action2ix( int action ){
     return abs(action);
 }
+
 COLOR GoState::action2color( int action ){
     assert( action != 0 );
     return (action > 0) ? WHITE : BLACK;
 }
+
 int GoState::ix2color( int ix ){
     return (ix == OFFBOARD) ? OFFBOARD : board[ix];
+}
+
+int GoState::coordColor2Action( int i, int j, COLOR color ){
+    int ix = coord2ix(i,j);
+    return ixColor2Action(ix, color);
+}
+
+int GoState::ixColor2Action( int ix, COLOR color ){
+    assert( color==WHITE || color==BLACK );
+    int mod = (color == WHITE) ? 1 : -1;
+    return ix*mod;
 }
 
 int GoState::coord2ix( int i, int j ){

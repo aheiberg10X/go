@@ -64,12 +64,22 @@ int main(){
     //for( int i=0; i < flood_len; i++ ){
         //cout << s.ix2coord( s.floodfill_array[i] ) << endl;
     //}    
+    //
 
-    s.setBoard( s.coord2ix(2,1), WHITE );
+    GoDomain gd;
+
     cout << s.toString() << endl;
-    cout << "is suicide: " << s.isSuicide( s.coord2ix(2,1) ) << endl;
+    int action = s.coordColor2Action( 2,1,BLACK );
+    gd.applyAction( (void*) &s, action, true );
 
-    GoDomain gd();
+    cout << s.toString() << endl;
+    cout << s.past_states[NUM_PAST_STATES-1]->toString() << endl;
+
+    //action = s.coordColor2Action( 4,3,WHITE );
+    //gd.applyAction( (void*) &s, action, true );
+    //s.setBoard( s.coord2ix(2,1), WHITE );
+    //cout << "is suicide: " << s.isSuicide( s.coord2ix(2,1) ) << endl;
+
 
 
     return 0;
