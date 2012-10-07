@@ -25,9 +25,8 @@ class Domain {
         virtual void getRewards( int* to_fill,
                                  void* state ) = 0;
 
-        virtual std::string randomAction( 
-                void* state,
-                std::set<std::string> to_exclude ) = 0;
+        virtual int randomAction( void* state,
+                                  std::set<int> to_exclude ) = 0;
 
         virtual bool fullyExpanded( int action ) = 0;
 

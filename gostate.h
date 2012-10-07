@@ -2,6 +2,7 @@
 #define GOSTATE_H
 
 #include <set>
+#include <vector>
 #include <string>
 
 using namespace std;
@@ -24,6 +25,7 @@ enum DIRECTION {
     SE = 7
 };
 
+const int PASS = 0;
 
 const int NUM_PAST_STATES = 10;
 
@@ -57,6 +59,7 @@ class GoState {
         void togglePlayer();
 
         int    action2ix(int);
+        int    ix2action(int, COLOR);
         COLOR  action2color(int);
         int    ix2color(int);
         int    coord2ix( int i, int j );
@@ -80,7 +83,7 @@ class GoState {
                             COLOR* color_array, 
                             int filter_len );
 
-        void floodFill( int* to_fill,
+         bool floodFill( int* to_fill,
                         int* to_fill_len,
                         int epicenter_ix,
                         /*int* neighbor_array, */

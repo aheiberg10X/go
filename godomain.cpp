@@ -9,12 +9,16 @@
 #include <set>
 #include <assert.h>
 #include <iostream>
+#include <algorithm>
 /*#include "goaction.h"*/
 
 using namespace std;
 
+static int excluded_action = -123;
+
 class GoDomain : public Domain {
 public :
+
     int getPlayerIx( void* state ){
         return 42;
     }
@@ -30,10 +34,13 @@ public :
 
 
         GoState* state = (GoState*) uncast_state;
+        //cout << state->toString() << endl;
+        cout << "actoin: " << action << " state->player: " << state->player << endl;
         assert( state->action2color(action) == state->player );
 
         bool legal = true;
         GoState* frozen = state->copy(false);
+        //cout << "froxqne toString: " << frozen->toString() << endl;
 
         if( ! state->isPass(action) ){
             int ix = state->action2ix(action);
@@ -57,18 +64,22 @@ public :
             for( int onix=0; onix < opp_len; onix++ ){
                 int floodfill_len = 0;
                 COLOR stop_color_array[1] = {EMPTY};
+                bool fill_completed =
                 state->floodFill( state->floodfill_array, &floodfill_len,
                                   opp_neighbs[onix],
                                   adjacency,
                                   filter_array, 1,
                                   stop_color_array, 1 );
-                state->setBoard( state->floodfill_array,
-                                 floodfill_len, 
-                                 EMPTY );
+                if( fill_completed ){
+                    state->setBoard( state->floodfill_array,
+                                     floodfill_len, 
+                                     EMPTY );
+                }
             }
 
             if( state->isSuicide( action ) ){
                 legal = false;
+                cout << "qwerqwerqwer" << endl;
             }
 
             //check past states for duplicates
@@ -76,6 +87,7 @@ public :
                 GoState* past_state = state->past_states[i];
                 if( state->sameAs( past_state->board,
                                    state->flipColor( past_state->player ) ) ){
+                    cout << "asdf" << endl;
                     legal = false;
                     break;
                 }
@@ -94,7 +106,7 @@ public :
                 state->past_states[NUM_PAST_STATES-1] = frozen;
             }
             else{
-                state = frozen;
+                uncast_state = (void*) frozen;
             }
             return true;
         }
@@ -104,7 +116,7 @@ public :
                 assert(false);
             }
             else{
-                state = frozen;
+                uncast_state = (void*) frozen;
             }
             return false;
         }  
@@ -123,7 +135,7 @@ public :
         map<int,StoneString*> stone_strings;
 
         //TODO
-        //this is unnecessary
+        //this building StoneStrings is unnecessary
         //we just need to go through and look for empty spots that become
         //territory.  Count them up and then count the stones
         //for( int ix=0; ix < boardsize; ix++ ){
@@ -163,31 +175,140 @@ public :
 
 
         marked.clear();
-        for( int ix=0; ix < boardsize; ix++ ){
-            if( board[ix] == OFFBOARD ||
-                board[ix] == WHITE    ||
-                board[ix] == BLACK    ||
+
+        int white_score = 0;
+        int black_score = 0;
+        for( int ix=0; ix < state->boardsize; ix++ ){
+            if( state->board[ix] == OFFBOARD ||
                 marked.find(ix) != marked.end() ){
                 continue;
             }
-            //find if the ix is neighbored by stones of only one color
-            //if yeah, floodfill it, on the lookup for the opp color
-            //mark the returned territory
-            //TODO performance leak here, say FF finds an opp color and 
-            //returns nothing.  All the EMPTIES looked at by floodfill
-            //will be reexamined as epicenters themselves, waste
-            //consider reworking signature, so that it sets a bool whether the
-            //stop colors were found.  If true, then floodfill_array can
-            //still be accessed to mark the useless nodes 
+            if( state->board[ix] == WHITE ){
+                white_score++;
+                continue;
+            }
+            if( state->board[ix] == BLACK ){
+                black_score++;
+                continue;
+            }
 
+            //find if ix has a neighbors of {WHITE,EMPTY} or {BLACK,EMPTY}
+            //if so, set ncolor to be WHITE or BLACK
+            //       set nix to be the ix of one such stone
+            //else, the ix is not anybody's territory
+            COLOR ncolor;
+            int nix;
 
+            int adjacency = 4;
+            int neighbs[adjacency];
+            state->neighborsOf( neighbs,
+                                ix,
+                                adjacency );
+            int white_neighbs[adjacency];
+            int num_white_neighbs = 0;
+            COLOR filter_colors[1] = {WHITE};
+            state->filterByColor( white_neighbs, &num_white_neighbs,
+                                  neighbs, adjacency, 
+                                  filter_colors, 1 );
 
+            int* black_neighbs;
+            int num_black_neighbs = 0;
+            filter_colors[0] = BLACK;
+            state->filterByColor( black_neighbs, &num_black_neighbs,
+                                  neighbs, adjacency,
+                                  filter_colors, 1 );
+
+            bool has_white = num_white_neighbs > 0;
+            bool has_black = num_black_neighbs > 0;
+            if(      has_white && ! has_black ) { ncolor = WHITE; }
+            else if( has_black && ! has_white ) { ncolor = BLACK; }
+            else                                { ncolor = EMPTY; }
+
+            //set nix to the first neighbor of the COLOR ncolor
+            for( int j=0; j<adjacency; j++ ){
+                nix = neighbs[j];
+                if( state->ix2color( nix ) == ncolor ){
+                    break;
+                }
+            }
+
+            if( ncolor == BLACK || ncolor == WHITE ){
+                int floodfill_len = 0;
+                COLOR flood_colors[1] = {EMPTY};
+                COLOR stop_colors[1] = {state->flipColor(ncolor)};
+                bool are_territories = 
+                    state->floodFill( state->floodfill_array, &floodfill_len,
+                                      nix, 
+                                      adjacency,
+                                      flood_colors, 1,
+                                      stop_colors, 1 );
+
+                //mark these empty positions regardless of their territory 
+                //status
+                for( int i=0; i<floodfill_len; i++ ){
+                    marked.insert( state->floodfill_array[i] );
+                    if( are_territories ){
+                        if( ncolor == WHITE ){
+                            white_score++;
+                        }
+                        else if( ncolor == BLACK ){
+                            black_score++;
+                        }
+                        else{ assert(false); }
+                    }
+                }
+            }
+        }
+        white_score *= 2;
+        black_score *= 2;
+        white_score += 11; //5.5*2
+
+        to_fill[0] = white_score;
+        to_fill[1] = black_score;
         return;
     }
 
-    string randomAction( void* state,
-                        set<string> to_exclude ){
-        return "adsfasdf";
+    int randomAction( void* uncast_state,
+                      set<int> to_exclude ){
+        GoState* state = (GoState*) uncast_state;
+
+        //get a random shuffle of the empty intersections
+        set<int>::iterator it;
+        int size = state->open_positions.size();
+        int empty_ixs[ size ];
+
+        int i = 0;
+        for( it = state->open_positions.begin();
+             it != state->open_positions.end();
+             it++ ){
+            empty_ixs[i++] = *it;
+        }
+        random_shuffle( &empty_ixs[0], 
+                        &empty_ixs[ size ] );
+
+        //try each one to see if legal
+        bool legal_moves_available = false;
+        int candidate, action;
+        for( int j=0; j<size; j++ ){
+            candidate = empty_ixs[j];
+            action = state->ix2action( candidate, state->player );
+            cout << "player: " << state->player << endl;
+            cout << "action to test: " << action << endl;
+            bool is_legal = applyAction( (void*) state, action, false );
+            if( is_legal ){
+                legal_moves_available = true;
+                if( to_exclude.find(action) == to_exclude.end() ){
+                    return action;
+                }
+            }
+        }
+
+        if( legal_moves_available ){ //but all were excluded...
+            return excluded_action;
+        }
+        else {
+            return PASS;
+        }
     }
     
     bool fullyExpanded( int action ){

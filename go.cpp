@@ -75,6 +75,13 @@ int main(){
     cout << s.toString() << endl;
     cout << s.past_states[NUM_PAST_STATES-1]->toString() << endl;
 
+    int rewards[2];
+    gd.getRewards( rewards, (void*) &s );
+    cout << "white_score: " << rewards[0] << " black_score: " << rewards[1] << endl;
+
+    set<int> to_exclude;
+    int raction = gd.randomAction( (void*) &s, to_exclude );
+    cout << raction << endl;
     //action = s.coordColor2Action( 4,3,WHITE );
     //gd.applyAction( (void*) &s, action, true );
     //s.setBoard( s.coord2ix(2,1), WHITE );

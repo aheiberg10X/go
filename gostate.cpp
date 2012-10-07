@@ -145,6 +145,10 @@ int GoState::neighbor(int ix, DIRECTION dir){
     }
 }
 
+int GoState::ix2action( int ix, COLOR player ){
+    return ix * (int) player;
+}
+
 int GoState::action2ix( int action ){
     return abs(action);
 }
@@ -236,7 +240,7 @@ void GoState::filterByColor( int* to_fill,
     }
 }
 
-void GoState::floodFill( int* to_fill,
+bool GoState::floodFill( int* to_fill,
                        int* to_fill_len, 
                        int epicenter_ix,
                        int adjacency,
@@ -250,6 +254,7 @@ void GoState::floodFill( int* to_fill,
     q.push(epicenter_ix);
 
     int neighbs[adjacency];
+    bool stop_color_not_encountered = true;
 
     while( !q.empty() ){
         int ix = q.front();
@@ -271,7 +276,8 @@ void GoState::floodFill( int* to_fill,
 
         bool stop_color_is_in_neighbs = filtered_len > 0;
         if( stop_color_is_in_neighbs ){
-            marked.clear();
+            //marked.clear();
+            stop_color_not_encountered = false;
             break;
         }
         else {
@@ -300,6 +306,8 @@ void GoState::floodFill( int* to_fill,
         to_fill[i++] = *it;
     }
     *to_fill_len = i;
+
+    return stop_color_not_encountered;
 
 }
 
@@ -335,17 +343,20 @@ bool GoState::isSuicide( int action ){
         if( marked.find(nix) != marked.end() ){ continue; }
 
         int flood_len = 0;
+        bool fill_completed = 
         floodFill( floodfill_array, &flood_len,
                    nix,
                    adjacency,
                    colors, 1,
                    stop_array, 1 );
-        for( int j=0; j < flood_len; j++ ){
-            //cout << "marking: " << floodfill_array[j] << endl;
-            marked.insert( floodfill_array[j] );
+        if( fill_completed ){
+            for( int j=0; j < flood_len; j++ ){
+                //cout << "marking: " << floodfill_array[j] << endl;
+                marked.insert( floodfill_array[j] );
+            }
         }
         //cout << "nix: " << nix << "no_liber: " << (flood_len > 0) << endl;
-        left_with_no_liberties |= flood_len > 0;
+        left_with_no_liberties |= fill_completed;
     }
 
     bool surrounded_by_kin = true;
