@@ -28,21 +28,21 @@ public :
         return (void*) gs->copy( false);
     };
 
-    bool applyAction( void* uncast_state, 
+    bool applyAction( void** p_uncast_state, 
                       int action,
                       bool side_effects ){
 
 
-        GoState* state = (GoState*) uncast_state;
+        GoState* state = (GoState*) *p_uncast_state;
         //cout << state->toString() << endl;
-        cout << "actoin: " << action << " state->player: " << state->player << endl;
-        assert( state->action2color(action) == state->player );
+        //cout << "actoin: " << action << " state->player: " << state->player << endl;
 
         bool legal = true;
         GoState* frozen = state->copy(false);
         //cout << "froxqne toString: " << frozen->toString() << endl;
 
         if( ! state->isPass(action) ){
+            assert( state->action2color(action) == state->player );
             int ix = state->action2ix(action);
             COLOR color = state->action2color(action);
             state->setBoard( ix, color );
@@ -79,7 +79,6 @@ public :
 
             if( state->isSuicide( action ) ){
                 legal = false;
-                cout << "qwerqwerqwer" << endl;
             }
 
             //check past states for duplicates
@@ -87,7 +86,6 @@ public :
                 GoState* past_state = state->past_states[i];
                 if( state->sameAs( past_state->board,
                                    state->flipColor( past_state->player ) ) ){
-                    cout << "asdf" << endl;
                     legal = false;
                     break;
                 }
@@ -106,7 +104,9 @@ public :
                 state->past_states[NUM_PAST_STATES-1] = frozen;
             }
             else{
-                uncast_state = (void*) frozen;
+                //TODO why does this cause segfault?
+                //delete state;
+                *p_uncast_state = (void*) frozen;
             }
             return true;
         }
@@ -116,7 +116,7 @@ public :
                 assert(false);
             }
             else{
-                uncast_state = (void*) frozen;
+                *p_uncast_state = (void*) frozen;
             }
             return false;
         }  
@@ -268,9 +268,9 @@ public :
         return;
     }
 
-    int randomAction( void* uncast_state,
+    int randomAction( void** p_uncast_state,
                       set<int> to_exclude ){
-        GoState* state = (GoState*) uncast_state;
+        GoState* state = (GoState*) *p_uncast_state;
 
         //get a random shuffle of the empty intersections
         set<int>::iterator it;
@@ -283,6 +283,7 @@ public :
              it++ ){
             empty_ixs[i++] = *it;
         }
+        srand(time(NULL));
         random_shuffle( &empty_ixs[0], 
                         &empty_ixs[ size ] );
 
@@ -292,9 +293,11 @@ public :
         for( int j=0; j<size; j++ ){
             candidate = empty_ixs[j];
             action = state->ix2action( candidate, state->player );
-            cout << "player: " << state->player << endl;
-            cout << "action to test: " << action << endl;
-            bool is_legal = applyAction( (void*) state, action, false );
+            //cout << "player: " << state->player << endl;
+            //cout << "action to test: " << action << endl;
+            //cout << "GoState* before AA: " << *p_uncast_state << endl;
+            bool is_legal = applyAction( p_uncast_state, action, false );
+            //cout << "GoState* after AA: " << *p_uncast_state << endl;
             if( is_legal ){
                 legal_moves_available = true;
                 if( to_exclude.find(action) == to_exclude.end() ){
@@ -312,11 +315,18 @@ public :
     }
     
     bool fullyExpanded( int action ){
+        return action == excluded_action;
+    }
+
+    bool isChanceAction( void* state ){
         return false;
     }
 
-    bool isTerminal( void* state ){
-        return true;
+    bool isTerminal( void* uncast_state ){
+        GoState* state = (GoState*) uncast_state;
+        GoState* last_state = state->past_states[NUM_PAST_STATES-1];
+        cout << "this act: " << state->action << " past act: " << last_state->action << endl;
+        return state->action == PASS && last_state->action == PASS;
     }
 
 };

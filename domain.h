@@ -15,7 +15,7 @@ class Domain {
 
         virtual void* copyState( void* state ) = 0;
 
-        virtual bool applyAction( void* state, 
+        virtual bool applyAction( void** state, 
                                   int action,
                                   bool side_effects ) = 0;
 
@@ -25,10 +25,12 @@ class Domain {
         virtual void getRewards( int* to_fill,
                                  void* state ) = 0;
 
-        virtual int randomAction( void* state,
+        virtual int randomAction( void** state,
                                   std::set<int> to_exclude ) = 0;
 
         virtual bool fullyExpanded( int action ) = 0;
+
+        virtual bool isChanceAction( void* state ) = 0;
 
         virtual bool isTerminal( void* state ) = 0;
 };

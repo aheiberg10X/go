@@ -50,6 +50,8 @@ class GoState {
         ~GoState();
         
         GoState* copy(bool shallow);
+        void copyInto( GoState* state );
+
         string toString();
 
         COLOR flipColor( COLOR c );

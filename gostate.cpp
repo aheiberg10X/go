@@ -60,13 +60,13 @@ GoState* GoState::copy( bool shallow ) {
         s->board[i] = board[i];
     }
 
-    set<int> op (open_positions);
+    set<int> op (open_positions.begin(), open_positions.end());
     s->open_positions = op;
 
     s->player = player;
+    s->action = action;
 
     if( ! shallow ){
-        cout << name << endl;
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             GoState* psc = past_states[i]->copy(true);
             s->past_states[i] = psc;
@@ -123,6 +123,8 @@ string GoState::toString(){
             out += "\n";
         }
     }
+    ss << "Action : " << action << endl;
+    out += ss.str();
     return out;
 }
 
@@ -200,14 +202,14 @@ void GoState::setBoard( int ix, COLOR color ){
     if( ix >= boardsize || board[ix] == OFFBOARD ){ return; }
 
     if( color == EMPTY ){
-        open_positions.erase(ix);
+        open_positions.insert(ix);
     }
     else{
-        open_positions.insert(ix);
+        assert( board[ix] == EMPTY );
+        open_positions.erase(ix);
     }
     board[ix] = color;
 }
-
 
 void* GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
     assert( adjacency==4 || adjacency==8 );
@@ -315,21 +317,24 @@ bool GoState::floodFill( int* to_fill,
 bool GoState::isSuicide( int action ){
     COLOR color = action2color( action );
     int ix = action2ix( action );
-    cout << "ix: " << ix << endl;
+    //cout << "ix: " << ix << endl;
     int adjacency = 4;
 
     neighborsOf( neighbor_array, ix, adjacency );
 
     //same colored neighbors
     COLOR colors[1] = {color};
-    int filtered[adjacency];
+    int filtered[adjacency+1];
     int filtered_len;
     filterByColor( filtered, &filtered_len,
                    neighbor_array, adjacency,
                    colors, 1 );
+    //add the origial ix to the filtered array
+    filtered[filtered_len] = ix;
+    filtered_len++;
+
 
     //floodfill each neighbor stopping if an adjacent EMPTY is found
-    //TODO: in python impl., the origial ix is added to filtered_array ??
     //If one of the groups has no liberties, the move is illegal
     //(Not considering moves that make space by capturing opponent first
     // these pieces should be removed beforehand)
