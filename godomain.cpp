@@ -19,8 +19,21 @@ static int excluded_action = -123;
 class GoDomain : public Domain {
 public :
 
+    int getNumPlayers( void* state ){
+        return 2; 
+    }
+
     int getPlayerIx( void* state ){
-        return 42;
+        COLOR player = ((GoState*) state)->player;
+        if( player == WHITE ){
+            return 0;
+        }
+        else if( player == BLACK ){
+            return 1;
+        }
+        else{
+            assert(false);
+        }
     }
 
     void* copyState( void* state ){
@@ -132,7 +145,7 @@ public :
         //ix : stonestring_id
         map<int,int> string_lookup;
         // stonestring_id : StoneString()
-        map<int,StoneString*> stone_strings;
+        //map<int,StoneString*> stone_strings;
 
         //TODO
         //this building StoneStrings is unnecessary
@@ -211,7 +224,7 @@ public :
                                   neighbs, adjacency, 
                                   filter_colors, 1 );
 
-            int* black_neighbs;
+            int black_neighbs[adjacency];
             int num_black_neighbs = 0;
             filter_colors[0] = BLACK;
             state->filterByColor( black_neighbs, &num_black_neighbs,
@@ -233,12 +246,16 @@ public :
             }
 
             if( ncolor == BLACK || ncolor == WHITE ){
+
+                //this is overkill given how we are moving
+                //is enough to just see a color adjacent to an empty
+                //assuming the rest bug free, it will be that colors territory
                 int floodfill_len = 0;
                 COLOR flood_colors[1] = {EMPTY};
                 COLOR stop_colors[1] = {state->flipColor(ncolor)};
                 bool are_territories = 
                     state->floodFill( state->floodfill_array, &floodfill_len,
-                                      nix, 
+                                      ix, 
                                       adjacency,
                                       flood_colors, 1,
                                       stop_colors, 1 );
@@ -263,8 +280,8 @@ public :
         black_score *= 2;
         white_score += 11; //5.5*2
 
-        to_fill[0] = white_score;
-        to_fill[1] = black_score;
+        to_fill[0] = white_score > black_score ? 1 : 0;
+        to_fill[1] = black_score > white_score ? 1 : 0;
         return;
     }
 
@@ -325,7 +342,7 @@ public :
     bool isTerminal( void* uncast_state ){
         GoState* state = (GoState*) uncast_state;
         GoState* last_state = state->past_states[NUM_PAST_STATES-1];
-        cout << "this act: " << state->action << " past act: " << last_state->action << endl;
+        //cout << "this act: " << state->action << " past act: " << last_state->action << endl;
         return state->action == PASS && last_state->action == PASS;
     }
 

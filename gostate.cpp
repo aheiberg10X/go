@@ -12,6 +12,7 @@ GoState::GoState( string name, int dimension, bool shallow ){
     bigdim = dim+2;
     boardsize = (bigdim)*(bigdim);
     board = new COLOR[boardsize];
+    action = 42;
     for( int i=0; i<boardsize; i++ ){
         if( i < bigdim || 
             i % bigdim == 0 || 

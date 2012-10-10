@@ -17,9 +17,13 @@ public :
     int search( void* root_state );
 
     MCTS_Node* treePolicy( MCTS_Node* node, 
-                           void*      state );
+                           void**     state );
+
+    MCTS_Node* randomPolicy( MCTS_Node* node, 
+                             void**     state );
+
     MCTS_Node* uctPolicy( MCTS_Node* node, 
-                          void*     state );
+                          void**    state );
 
     //side effect: updates pstate by applying action
     MCTS_Node* expand( MCTS_Node* parent, 
@@ -36,11 +40,12 @@ public :
                           void*      pstate, 
                           int        player_ix );
 
-    void defaultPolicy( int* rewards, 
-                        void* state );
+    void defaultPolicy( int*    rewards, 
+                        void** state );
 
     void backprop( MCTS_Node* node, 
-                   int*       rewards );
+                   int*       rewards,
+                   int        num_rewards );
 };
 
 #endif

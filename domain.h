@@ -11,6 +11,7 @@
 
 class Domain {
     public :
+        virtual int getNumPlayers( void* state ) = 0;
         virtual int getPlayerIx( void* state ) = 0;
 
         virtual void* copyState( void* state ) = 0;
