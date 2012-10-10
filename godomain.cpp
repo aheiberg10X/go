@@ -118,8 +118,12 @@ public :
             }
             else{
                 //TODO why does this cause segfault?
-                //delete state;
+                //p_uncast_state = ((void**) &frozen);
                 *p_uncast_state = (void*) frozen;
+                //cout << "\nstate: " << state << endl;
+                //cout << "deref p_uncast: " << *p_uncast_state << endl;
+                delete state;
+
             }
             return true;
         }
@@ -129,7 +133,10 @@ public :
                 assert(false);
             }
             else{
+                //p_uncast_state = ((void**) &frozen);
+                //
                 *p_uncast_state = (void*) frozen;
+                delete state;
             }
             return false;
         }  

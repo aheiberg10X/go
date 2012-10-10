@@ -43,8 +43,11 @@ GoState::GoState( string name, int dimension, bool shallow ){
 }
 
 GoState::~GoState(){
+    //cout << "deleteing: " << name << endl;
     delete board;
     delete floodfill_array;
+    open_positions.clear();
+
     if( shallow ){
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             delete past_states[i];
@@ -55,7 +58,7 @@ GoState::~GoState(){
 }
 
 GoState* GoState::copy( bool shallow ) {
-    GoState* s = new GoState( name+"copy", dim, false );
+    GoState* s = new GoState( "copy", dim, false );
     
     for( int i=0; i<boardsize; i++ ){
         s->board[i] = board[i];
@@ -221,11 +224,11 @@ void* GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
 }
 
 void GoState::filterByColor( int* to_fill, 
-                           int* to_fill_len,
-                           int* neighbs, 
-                           int adjacency, 
-                           COLOR* color_array,
-                           int filter_len ){
+                             int* to_fill_len,
+                             int* neighbs, 
+                             int adjacency, 
+                             COLOR* color_array,
+                             int filter_len ){
 
     *to_fill_len = 0;
     int fillix = 0;
@@ -253,9 +256,13 @@ bool GoState::floodFill( int* to_fill,
                        int stop_len ){
 
     set<int> marked;
+    set<int> on_queue;
     queue<int> q;
     q.push(epicenter_ix);
-
+    
+    //for(int i=0; i<boardsize; i++){
+    //q.push(i);
+    //}
     int neighbs[adjacency];
     bool stop_color_not_encountered = true;
 
@@ -263,6 +270,7 @@ bool GoState::floodFill( int* to_fill,
         int ix = q.front();
         q.pop();
         marked.insert(ix);
+        //cout << "inserting: " << ix << endl;
  
         neighborsOf( neighbs, 
                      ix, 
@@ -293,10 +301,14 @@ bool GoState::floodFill( int* to_fill,
                            filter_len );
             //see if connector neighbors are already in marked
             //if not, add them
+            assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
                 int ix = filtered_array[faix];
-                if( marked.find( ix ) == marked.end() ){
+                if( marked.find( ix ) == marked.end() && 
+                    on_queue.find(ix) == on_queue.end() ){
+                    //cout << "pushing: " << ix << endl;
                     q.push(ix);
+                    on_queue.insert(ix);
                 }
             }
         }
@@ -310,8 +322,12 @@ bool GoState::floodFill( int* to_fill,
     }
     *to_fill_len = i;
 
+    marked.clear();
+    queue<int> empty;
+    std::swap( q, empty );
+    //delete neighbs;
+    cout << "\n\n\n\nFINISHING\n\n\n\n";
     return stop_color_not_encountered;
-
 }
 
 //assumes setBoard(action) already applied
@@ -355,6 +371,8 @@ bool GoState::isSuicide( int action ){
                    adjacency,
                    colors, 1,
                    stop_array, 1 );
+        //delete colors;
+
         if( fill_completed ){
             for( int j=0; j < flood_len; j++ ){
                 //cout << "marking: " << floodfill_array[j] << endl;
@@ -364,7 +382,8 @@ bool GoState::isSuicide( int action ){
         //cout << "nix: " << nix << "no_liber: " << (flood_len > 0) << endl;
         left_with_no_liberties |= fill_completed;
     }
-
+    //delete filtered;
+    //delete stop_array;
     bool surrounded_by_kin = true;
     for( int i=0; i<adjacency; i++ ){
         int ncolor = ix2color( neighbor_array[i] );
