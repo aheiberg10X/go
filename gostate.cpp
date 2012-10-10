@@ -6,7 +6,7 @@
 #include <iostream>
 #include <sstream>
 
-GoState::GoState( string name, int dimension, bool shallow ){
+GoState::GoState( string name, int dimension, bool ashallow ){
     this->name = name;
     dim = dimension;
     bigdim = dim+2;
@@ -29,11 +29,11 @@ GoState::GoState( string name, int dimension, bool shallow ){
 
     floodfill_array = new int[boardsize];
 
-    if( ! shallow ){
+    if( ! ashallow ){
         shallow = false;
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             stringstream ss;
-            ss << "ps" << i;
+            ss << name+"_ps" << i;
             past_states[i] = new GoState( ss.str(), dim, true);
         } 
     }
@@ -43,12 +43,11 @@ GoState::GoState( string name, int dimension, bool shallow ){
 }
 
 GoState::~GoState(){
-    //cout << "deleteing: " << name << endl;
     delete board;
     delete floodfill_array;
     open_positions.clear();
 
-    if( shallow ){
+    if( !shallow ){
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             delete past_states[i];
         }
@@ -57,9 +56,9 @@ GoState::~GoState(){
     //delete past_states;
 }
 
-GoState* GoState::copy( bool shallow ) {
-    GoState* s = new GoState( "copy", dim, false );
-    
+GoState* GoState::copy( bool ashallow ) {
+    GoState* s = new GoState( "copy", dim, true );
+
     for( int i=0; i<boardsize; i++ ){
         s->board[i] = board[i];
     }
@@ -70,11 +69,12 @@ GoState* GoState::copy( bool shallow ) {
     s->player = player;
     s->action = action;
 
-    if( ! shallow ){
+    if( ! ashallow ){
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             GoState* psc = past_states[i]->copy(true);
             s->past_states[i] = psc;
         }
+        s->shallow = ashallow;
     }
 
     return s;
@@ -326,7 +326,6 @@ bool GoState::floodFill( int* to_fill,
     queue<int> empty;
     std::swap( q, empty );
     //delete neighbs;
-    cout << "\n\n\n\nFINISHING\n\n\n\n";
     return stop_color_not_encountered;
 }
 

@@ -22,33 +22,37 @@ int main(){
     if( true ){
 
         string name = "original";
-        GoState* state = new GoState( name, 50, false );
+        GoState* state = new GoState( name, 9, false );
 
-        int filtered_array[4];
-        int filtered_len = 0;
-
-        int floodfill_len = 0;
-        COLOR flood_array[1] = {EMPTY};
-        COLOR stop_array[1] = {BLACK};
-        int count = 0;
-        while( count < 100000 ){
-            //state->neighborsOf( state->floodfill_array,
-            //48,
-            //4 );
-            //state->filterByColor( filtered_array,
-            //&filtered_len,
-            //state->floodfill_array,
-            //4,
-            //flood_array, 1 );
-
-            state->floodFill( state->floodfill_array,
-                    &floodfill_len,
-                    55,
-                    4,
-                    flood_array, 1,
-                    stop_array, 1 );
-            count++;
-        }
+        //int filtered_array[4];
+        //int filtered_len = 0;
+        //
+        //int floodfill_len = 0;
+        //COLOR flood_array[1] = {EMPTY};
+        //COLOR stop_array[1] = {BLACK};
+        //
+        //int count = 0;
+        //
+        //while( count < 100000 ){
+        ////state->neighborsOf( state->floodfill_array,
+        ////48,
+        ////4 );
+        ////state->filterByColor( filtered_array,
+        ////&filtered_len,
+        ////state->floodfill_array,
+        ////4,
+        ////flood_array, 1 );
+        //
+        ////state->floodFill( state->floodfill_array,
+        ////&floodfill_len,
+        ////55,
+        ////4,
+        ////flood_array, 1,
+        ////stop_array, 1 );
+        ////
+        //state->isSuicide( 15 );
+        //count++;
+        //}
                               
 
         //const int l = 6;
@@ -67,20 +71,26 @@ int main(){
 
         //state->togglePlayer();
         
-        //GoDomain gd;
+        GoDomain gd;
 
         //cout << state->toString() << endl;
-        
-        //set<int> to_exclude;
-        //while( ! gd.isTerminal( state ) ){
-        ////cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-        ////cout << "current state: " << state->toString() << endl;
-        ////cout << "last state: " << state->past_states[NUM_PAST_STATES-1]->toString() << endl;
-        //int raction = gd.randomAction( (void**) &state, to_exclude );
-        ////cout << "\nrand act: " << raction << endl;
-        //gd.applyAction( (void**) &state, raction, true );
+        //int count = 0;
+        //while( count < 100000 ){
+        //int action = state->coordColor2Action(2,1,BLACK);
+        //gd.applyAction( (void**) &state, action, false );
+        //count++;
         //}
-        //cout << "finished" << endl;
+        
+        set<int> to_exclude;
+        while( ! gd.isTerminal( state ) ){
+            //cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+            //cout << "current state: " << state->toString() << endl;
+            //cout << "last state: " << state->past_states[NUM_PAST_STATES-1]->toString() << endl;
+            int raction = gd.randomAction( (void**) &state, to_exclude );
+            cout << "\napplying rand act: " << raction << " to: \n" << state->toString() << endl;
+            gd.applyAction( (void**) &state, raction, true );
+        }
+        cout << "finished" << endl;
 
         //int rewards[2];
         //gd.getRewards( rewards, (void*) &s );

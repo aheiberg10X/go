@@ -120,6 +120,7 @@ public :
                 //TODO why does this cause segfault?
                 //p_uncast_state = ((void**) &frozen);
                 *p_uncast_state = (void*) frozen;
+                cout << "frozen player: " << frozen->player << endl;
                 //cout << "\nstate: " << state << endl;
                 //cout << "deref p_uncast: " << *p_uncast_state << endl;
                 delete state;
@@ -136,10 +137,14 @@ public :
                 //p_uncast_state = ((void**) &frozen);
                 //
                 *p_uncast_state = (void*) frozen;
+                cout << "frozen player: " << frozen->player << endl;
                 delete state;
+                cout << "frozen player2: " << frozen->player << endl;
             }
             return false;
         }  
+        //state->setBoard( state->action2ix(action), EMPTY );
+        //return false;
     }
     
     void getRewards( int* to_fill,
@@ -317,10 +322,12 @@ public :
         for( int j=0; j<size; j++ ){
             candidate = empty_ixs[j];
             action = state->ix2action( candidate, state->player );
-            //cout << "player: " << state->player << endl;
+            cout << "candidate empty pos: " << candidate << " toAction: " << action << endl;
+            cout << "player befor beforee: " << state->player << endl;
             //cout << "action to test: " << action << endl;
             //cout << "GoState* before AA: " << *p_uncast_state << endl;
             bool is_legal = applyAction( p_uncast_state, action, false );
+            cout << "is legal: " << is_legal << " player after: " << state->player << endl;
             //cout << "GoState* after AA: " << *p_uncast_state << endl;
             if( is_legal ){
                 legal_moves_available = true;
