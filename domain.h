@@ -2,7 +2,7 @@
 #define DOMAIN_H
 
 #include <string>
-#include <set>
+/*#include <set>*/
 /*#include "action.h"*/
 
 //TODO
@@ -12,6 +12,7 @@
 class Domain {
     public :
         virtual int getNumPlayers( void* state ) = 0;
+        virtual int getNumActions( void* state ) = 0;
         virtual int getPlayerIx( void* state ) = 0;
 
         virtual void* copyState( void* state ) = 0;
@@ -27,7 +28,7 @@ class Domain {
                                  void* state ) = 0;
 
         virtual int randomAction( void** state,
-                                  std::set<int> to_exclude ) = 0;
+                                  bool* to_exclude ) = 0;
 
         virtual bool fullyExpanded( int action ) = 0;
 

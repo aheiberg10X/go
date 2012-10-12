@@ -1,11 +1,14 @@
 #ifndef GOSTATE_H 
 #define GOSTATE_H
 
-#include <set>
-#include <vector>
+/*#include <functional>*/
+/*#include <set>*/
+/*#include <vector>*/
 #include <string>
+/*#include <unordered_set>*/
+/*#include <hash_map>*/
 
-using namespace std;
+/*using namespace std;*/
 
 enum COLOR {
     BLACK = -1,
@@ -38,21 +41,26 @@ class GoState {
         COLOR* board;
         int action;
         bool shallow;
+        /*std::unordered_set<int> test;*/
 
         //straightforward to remove if need memory
-        set<int> open_positions;
+        /*std::set<int> open_positions;*/
+        /*int open_positions[boardsize];*/
+        /*int num_open;*/
+        int num_open;
+
         COLOR player;
         GoState* past_states[NUM_PAST_STATES];
         //TODO: past states
         
         //ctor
-        GoState ( string, int, bool );
+        GoState ( std::string, int, bool );
         ~GoState();
         
         GoState* copy(bool shallow);
         void copyInto( GoState* state );
 
-        string toString();
+        std::string toString();
 
         COLOR flipColor( COLOR c );
         bool sameAs( COLOR* board, COLOR player );
@@ -65,7 +73,7 @@ class GoState {
         COLOR  action2color(int);
         int    ix2color(int);
         int    coord2ix( int i, int j );
-        string ix2coord( int ix );
+        std::string ix2coord( int ix );
         bool isPass( int action );
         int coordColor2Action( int i, int j, COLOR color );
         int ixColor2Action( int ix, COLOR color );

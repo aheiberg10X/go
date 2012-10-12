@@ -1,10 +1,15 @@
 #include "gostate.h"
 
 #include <stdlib.h>
+//TODO: replace these two
 #include <queue>
+#include <set>
+
 #include <assert.h>
 #include <iostream>
 #include <sstream>
+
+using namespace std;
 
 GoState::GoState( string name, int dimension, bool ashallow ){
     this->name = name;
@@ -13,6 +18,7 @@ GoState::GoState( string name, int dimension, bool ashallow ){
     boardsize = (bigdim)*(bigdim);
     board = new COLOR[boardsize];
     action = 42;
+    num_open = 0;
     for( int i=0; i<boardsize; i++ ){
         if( i < bigdim || 
             i % bigdim == 0 || 
@@ -22,7 +28,8 @@ GoState::GoState( string name, int dimension, bool ashallow ){
         }
         else{
             board[i] = EMPTY; 
-            open_positions.insert(i);
+            num_open++;
+            //open_positions.insert(i);
         }
     }
     player = BLACK;
@@ -45,7 +52,7 @@ GoState::GoState( string name, int dimension, bool ashallow ){
 GoState::~GoState(){
     delete board;
     delete floodfill_array;
-    open_positions.clear();
+    //open_positions.clear();
 
     if( !shallow ){
         for( int i=0; i < NUM_PAST_STATES; i++ ){
@@ -63,8 +70,9 @@ GoState* GoState::copy( bool ashallow ) {
         s->board[i] = board[i];
     }
 
-    set<int> op (open_positions.begin(), open_positions.end());
-    s->open_positions = op;
+    //set<int> op (open_positions.begin(), open_positions.end());
+    //s->open_positions = op;
+    s->num_open = num_open;
 
     s->player = player;
     s->action = action;
@@ -206,11 +214,13 @@ void GoState::setBoard( int ix, COLOR color ){
     if( ix >= boardsize || board[ix] == OFFBOARD ){ return; }
 
     if( color == EMPTY ){
-        open_positions.insert(ix);
+        //open_positions.insert(ix);
+        num_open++;
     }
     else{
         assert( board[ix] == EMPTY );
-        open_positions.erase(ix);
+        num_open--;
+        //open_positions.erase(ix);
     }
     board[ix] = color;
 }

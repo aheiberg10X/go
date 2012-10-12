@@ -2,7 +2,7 @@
 #define MCTS_H
 
 #include <string>
-#include "mcts_node.cpp"
+#include "mcts_node.h"
 #include "domain.h"
 
 class MCTS {

@@ -9,9 +9,10 @@ using namespace std;
 
 int main(){
 
-    //mcts testing
-    if( false ){
-        GoState* gs = new GoState( "s", 4, false );
+    srand(time(NULL));
+
+    if( true ){
+        GoState* gs = new GoState( "s", 9, false );
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
         int best_action = mcts.search( (void*) gs );
@@ -19,10 +20,10 @@ int main(){
     }
     
     //domain testing
-    if( true ){
+    if( false ){
 
         string name = "original";
-        GoState* state = new GoState( name, 9, false );
+        GoState* state = new GoState( name, 4, false );
 
         //int filtered_array[4];
         //int filtered_len = 0;
@@ -81,7 +82,10 @@ int main(){
         //count++;
         //}
         
-        set<int> to_exclude;
+        bool to_exclude[state->boardsize];
+        for(int i=0; i<state->boardsize; i++){
+           to_exclude[i] = false;
+        }
         while( ! gd.isTerminal( state ) ){
             //cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
             //cout << "current state: " << state->toString() << endl;

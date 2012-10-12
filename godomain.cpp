@@ -2,13 +2,15 @@
 #define GODOMAIN_H
 
 #include "domain.h"
-#include "stonestring.h"
+//#include "stonestring.h"
 #include <string>
-#include <map>
+//#include <map>
 #include "gostate.h"
+//TODO: replace marked with bitmask array
 #include <set>
 #include <assert.h>
 #include <iostream>
+//TODO: will have to write own shuffling algorithm for CUDA kernel
 #include <algorithm>
 /*#include "goaction.h"*/
 
@@ -18,6 +20,10 @@ static int excluded_action = -123;
 
 class GoDomain : public Domain {
 public :
+
+    int getNumActions( void* state ){
+        return ((GoState*) state)->boardsize;
+    }
 
     int getNumPlayers( void* state ){
         return 2; 
@@ -45,19 +51,24 @@ public :
                       int action,
                       bool side_effects ){
 
-
+        assert( action >= 0 );
         GoState* state = (GoState*) *p_uncast_state;
         //cout << state->toString() << endl;
-        //cout << "actoin: " << action << " state->player: " << state->player << endl;
+        //cout << "ix: " << action << " state->player: " << state->player << endl;
 
         bool legal = true;
         GoState* frozen = state->copy(false);
         //cout << "froxqne toString: " << frozen->toString() << endl;
 
+        //The action parameter is really the index of the action to be taken
+        //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
+        int ix = action;
+        COLOR color = state->player;
+        action = state->ix2action(action, color);
+
         if( ! state->isPass(action) ){
-            assert( state->action2color(action) == state->player );
-            int ix = state->action2ix(action);
-            COLOR color = state->action2color(action);
+            //assert( state->action2color(action) == state->player );
+            //COLOR color = state->action2color(action);
             state->setBoard( ix, color );
 
             //resolve captures
@@ -98,7 +109,7 @@ public :
             for( int i=0; i < NUM_PAST_STATES; i++ ){
                 GoState* past_state = state->past_states[i];
                 if( state->sameAs( past_state->board,
-                                   state->flipColor( past_state->player ) ) ){
+                            state->flipColor( past_state->player ) ) ){
                     legal = false;
                     break;
                 }
@@ -120,7 +131,7 @@ public :
                 //TODO why does this cause segfault?
                 //p_uncast_state = ((void**) &frozen);
                 *p_uncast_state = (void*) frozen;
-                cout << "frozen player: " << frozen->player << endl;
+                //cout << "frozen player: " << frozen->player << endl;
                 //cout << "\nstate: " << state << endl;
                 //cout << "deref p_uncast: " << *p_uncast_state << endl;
                 delete state;
@@ -130,16 +141,16 @@ public :
         }
         else{
             if( side_effects ){
-                cout << "action: " << action << endl;
+                //cout << "action: " << action << endl;
                 assert(false);
             }
             else{
                 //p_uncast_state = ((void**) &frozen);
                 //
-                *p_uncast_state = (void*) frozen;
-                cout << "frozen player: " << frozen->player << endl;
                 delete state;
-                cout << "frozen player2: " << frozen->player << endl;
+                *p_uncast_state = (void*) frozen;
+                //cout << "frozen player: " << frozen->player << endl;
+                //cout << "frozen player2: " << frozen->player << endl;
             }
             return false;
         }  
@@ -155,7 +166,7 @@ public :
         set<int> marked;
         int string_id = 0;
         //ix : stonestring_id
-        map<int,int> string_lookup;
+        //map<int,int> string_lookup;
         // stonestring_id : StoneString()
         //map<int,StoneString*> stone_strings;
 
@@ -297,22 +308,27 @@ public :
         return;
     }
 
+    //return an unsigned action, i.e an ix in the board
     int randomAction( void** p_uncast_state,
-                      set<int> to_exclude ){
-        GoState* state = (GoState*) *p_uncast_state;
+                      bool* to_exclude ){
 
+        GoState* state = (GoState*) *p_uncast_state;
         //get a random shuffle of the empty intersections
         set<int>::iterator it;
-        int size = state->open_positions.size();
+        int size = state->num_open; //state->open_positions.size();
         int empty_ixs[ size ];
 
         int i = 0;
-        for( it = state->open_positions.begin();
-             it != state->open_positions.end();
-             it++ ){
-            empty_ixs[i++] = *it;
+        //for( it = state->open_positions.begin();
+        //it != state->open_positions.end();
+        //it++ ){
+        //empty_ixs[i++] = *it;
+        //}
+        for( int ix=0; ix<state->boardsize; ix++ ){
+            if( state->board[ix] == EMPTY ){
+                empty_ixs[i++] = ix;
+            }
         }
-        srand(time(NULL));
         random_shuffle( &empty_ixs[0], 
                         &empty_ixs[ size ] );
 
@@ -321,18 +337,15 @@ public :
         int candidate, action;
         for( int j=0; j<size; j++ ){
             candidate = empty_ixs[j];
-            action = state->ix2action( candidate, state->player );
-            cout << "candidate empty pos: " << candidate << " toAction: " << action << endl;
-            cout << "player befor beforee: " << state->player << endl;
-            //cout << "action to test: " << action << endl;
-            //cout << "GoState* before AA: " << *p_uncast_state << endl;
-            bool is_legal = applyAction( p_uncast_state, action, false );
-            cout << "is legal: " << is_legal << " player after: " << state->player << endl;
-            //cout << "GoState* after AA: " << *p_uncast_state << endl;
+            //action = state->ix2action( candidate, state->player );
+            bool is_legal = applyAction( p_uncast_state, candidate, false );
+            state = (GoState*) *p_uncast_state;
+
             if( is_legal ){
                 legal_moves_available = true;
-                if( to_exclude.find(action) == to_exclude.end() ){
-                    return action;
+                if( to_exclude[candidate] == false ){
+                    //return action;
+                    return candidate;
                 }
             }
         }
@@ -356,7 +369,6 @@ public :
     bool isTerminal( void* uncast_state ){
         GoState* state = (GoState*) uncast_state;
         GoState* last_state = state->past_states[NUM_PAST_STATES-1];
-        //cout << "this act: " << state->action << " past act: " << last_state->action << endl;
         return state->action == PASS && last_state->action == PASS;
     }
 
