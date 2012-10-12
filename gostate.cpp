@@ -10,6 +10,46 @@
 #include <sstream>
 
 using namespace std;
+BitMask::BitMask( int asize ){
+    size = asize;
+    mod = 32;
+    if( asize % mod == 0 ){
+        num_rows = asize/mod;
+    }
+    else{
+        num_rows = asize/mod+1;
+    }
+    masks = new int[num_rows];
+    for( int i=0; i<num_rows; i++ ){
+        masks[i] = 0;
+    }
+}
+
+BitMask::~BitMask(){
+    delete masks;
+}
+
+void BitMask::set( int bit, bool value ) {
+    if( bit >= size ){ return; }
+    int row = bit / mod;
+    int col = bit % mod;
+    if( value == 1){
+        masks[row] |= (int) value << col;
+    }
+    else if( value == 0 ){
+        masks[row] &= (int) value << col;
+    }
+    else{
+        assert(false);
+    }
+}
+
+bool BitMask::get( int bit ){
+    int row = bit / mod;
+    int col = bit % mod;
+    return (bool) ((masks[row] >> col) & 1);
+}
+
 
 GoState::GoState( string name, int dimension, bool ashallow ){
     this->name = name;
@@ -265,8 +305,10 @@ bool GoState::floodFill( int* to_fill,
                        COLOR* stop_color_array, 
                        int stop_len ){
 
-    set<int> marked;
-    set<int> on_queue;
+    //set<int> marked;
+    //set<int> on_queue;
+    BitMask marked (boardsize);
+    BitMask on_queue(boardsize);
     queue<int> q;
     q.push(epicenter_ix);
     
@@ -279,7 +321,8 @@ bool GoState::floodFill( int* to_fill,
     while( !q.empty() ){
         int ix = q.front();
         q.pop();
-        marked.insert(ix);
+        //marked.insert(ix);
+        marked.set(ix,true);
         //cout << "inserting: " << ix << endl;
  
         neighborsOf( neighbs, 
@@ -314,11 +357,11 @@ bool GoState::floodFill( int* to_fill,
             assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
                 int ix = filtered_array[faix];
-                if( marked.find( ix ) == marked.end() && 
-                    on_queue.find(ix) == on_queue.end() ){
+                if( !marked.get(ix) && !on_queue.get(ix) ){
+//marked.find( ix ) == marked.end() && 
                     //cout << "pushing: " << ix << endl;
                     q.push(ix);
-                    on_queue.insert(ix);
+                    on_queue.set(ix,true);
                 }
             }
         }
@@ -326,13 +369,18 @@ bool GoState::floodFill( int* to_fill,
     
     //populate to_fill; kinda of unnecassay just did to keep use pattern same
     int i = 0;
-    set<int>::iterator it;
-    for( it = marked.begin(); it != marked.end(); it++ ){
-        to_fill[i++] = *it;
+    //set<int>::iterator it;
+    //for( it = marked.begin(); it != marked.end(); it++ ){
+    //to_fill[i++] = *it;
+    //}
+    for( int j=0; j<boardsize; j++ ){
+        if( marked.get(j) ){
+            to_fill[i++] = j;
+        }
     }
     *to_fill_len = i;
 
-    marked.clear();
+    //marked.clear();
     queue<int> empty;
     std::swap( q, empty );
     //delete neighbs;

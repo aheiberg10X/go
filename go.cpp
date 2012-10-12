@@ -11,7 +11,22 @@ int main(){
 
     srand(time(NULL));
 
-    if( true ){
+    if( false ){
+        BitMask bm( 45 );
+        bm.set(1,false);
+        cout << bm.get(1) << endl;
+        bm.set(1,true);
+        cout << bm.get(1) << endl;
+        bm.set(44,true);
+        cout << bm.get(44) << endl;
+        bm.set(44,false);
+        cout << bm.get(44) << endl;
+
+
+    }
+
+
+    if( false ){
         GoState* gs = new GoState( "s", 9, false );
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
@@ -20,10 +35,13 @@ int main(){
     }
     
     //domain testing
-    if( false ){
+    //randomAction and applyAction, the crucial parts of the simulation kernel,
+    //work in fixed memory
+    if( true ){
 
         string name = "original";
-        GoState* state = new GoState( name, 4, false );
+        GoState* state = new GoState( name, 9, false );
+        void** p_uncast_state = (void**) &state;
 
         //int filtered_array[4];
         //int filtered_len = 0;
@@ -86,22 +104,24 @@ int main(){
         for(int i=0; i<state->boardsize; i++){
            to_exclude[i] = false;
         }
-        while( ! gd.isTerminal( state ) ){
+        while( ! gd.isTerminal( *p_uncast_state ) ){
             //cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
             //cout << "current state: " << state->toString() << endl;
             //cout << "last state: " << state->past_states[NUM_PAST_STATES-1]->toString() << endl;
-            int raction = gd.randomAction( (void**) &state, to_exclude );
+            int raction = gd.randomAction( p_uncast_state, to_exclude );
             cout << "\napplying rand act: " << raction << " to: \n" << state->toString() << endl;
-            gd.applyAction( (void**) &state, raction, true );
+            gd.applyAction( p_uncast_state, raction, true );
+
         }
         cout << "finished" << endl;
 
-        //int rewards[2];
-        //gd.getRewards( rewards, (void*) &s );
-        //cout << "white_score: " << rewards[0] << " black_score: " << rewards[1] << endl;
+        int rewards[2];
+        state = (GoState*) *p_uncast_state;
+        gd.getRewards( rewards, *p_uncast_state );
+        cout << "white_score: " << rewards[0] << " black_score: " << rewards[1] << endl;
 
 
-        //cout << "isTerminal: " << gd.isTerminal( (void*) state ) << endl;
+        //cout << "isTerminal: " << gd.isTerminal( (void*) s&tate ) << endl;
         //action = s.coordColor2Action( 4,3,WHITE );
         //gd.applyAction( (void*) &s, action, true );
         //s.setBoard( s.coord2ix(2,1), WHITE );

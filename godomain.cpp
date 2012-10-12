@@ -163,7 +163,9 @@ public :
 
         GoState* state = (GoState*) uncast_state;
 
-        set<int> marked;
+        //set<int> marked;
+        BitMask marked( state->boardsize );
+        //cout << "ere1" << endl;
         int string_id = 0;
         //ix : stonestring_id
         //map<int,int> string_lookup;
@@ -208,15 +210,17 @@ public :
             //}
         //}
         //
-
-
-        marked.clear();
+        //marked.clear();
 
         int white_score = 0;
         int black_score = 0;
         for( int ix=0; ix < state->boardsize; ix++ ){
+            //cout << "marekd at: " << ix << " : " << marked.get(ix) << endl;
+            //cout << state->board[ix] << endl;
             if( state->board[ix] == OFFBOARD ||
-                marked.find(ix) != marked.end() ){
+                marked.get(ix) ){
+                    //marked.find(ix) != marked.end() ){
+                    //cout << "here2" << endl;
                 continue;
             }
             if( state->board[ix] == WHITE ){
@@ -227,6 +231,7 @@ public :
                 black_score++;
                 continue;
             }
+            //cout << "asdfasdf" << endl;
 
             //find if ix has a neighbors of {WHITE,EMPTY} or {BLACK,EMPTY}
             //if so, set ncolor to be WHITE or BLACK
@@ -286,7 +291,10 @@ public :
                 //mark these empty positions regardless of their territory 
                 //status
                 for( int i=0; i<floodfill_len; i++ ){
-                    marked.insert( state->floodfill_array[i] );
+                    //cout << "here3" <<endl;
+                    marked.set( state->floodfill_array[i], true );
+                    //cout << "here4"  <<endl;
+                    //marked.insert( state->floodfill_array[i] );
                     if( are_territories ){
                         if( ncolor == WHITE ){
                             white_score++;

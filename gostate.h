@@ -31,6 +31,16 @@ enum DIRECTION {
 const int PASS = 0;
 
 const int NUM_PAST_STATES = 10;
+struct BitMask {
+    int size;
+    int mod;
+    int num_rows;
+    int* masks;
+    BitMask( int asize );
+    ~BitMask();
+    void set( int bit, bool value );    
+    bool get( int bit );
+};
 
 class GoState {
     public :
