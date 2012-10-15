@@ -1,6 +1,7 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
 
+#include "bitmask.cpp"
 #include <string>
 /*#include <set>*/
 /*#include "action.h"*/
@@ -28,7 +29,7 @@ class Domain {
                                  void* state ) = 0;
 
         virtual int randomAction( void** state,
-                                  bool* to_exclude ) = 0;
+                                  BitMask* to_exclude ) = 0;
 
         virtual bool fullyExpanded( int action ) = 0;
 

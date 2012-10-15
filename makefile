@@ -20,8 +20,11 @@ stonestring.o:
 go.o:
 	g++ -c go.cpp ${CFLAGS}  
 
-gostate.o: 
+gostate.o: queue.o 
 	g++ -c gostate.cpp ${CFLAGS}
+
+queue.o:
+	g++ -c queue.cpp ${CFLAGS}
 
 clean:
 	rm -rf *.o go 

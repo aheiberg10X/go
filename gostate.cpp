@@ -1,55 +1,20 @@
 #include "gostate.h"
 
 #include <stdlib.h>
-//TODO: replace these two
-#include <queue>
-#include <set>
-
 #include <assert.h>
 #include <iostream>
 #include <sstream>
 
+#include "queue.cpp"
+#include "bitmask.cpp"
+//TODO: remove this and see what breaks
+//will need to come out
+
 using namespace std;
-BitMask::BitMask( int asize ){
-    size = asize;
-    mod = 32;
-    if( asize % mod == 0 ){
-        num_rows = asize/mod;
-    }
-    else{
-        num_rows = asize/mod+1;
-    }
-    masks = new int[num_rows];
-    for( int i=0; i<num_rows; i++ ){
-        masks[i] = 0;
-    }
-}
+//TODO move BItmask to own file
 
-BitMask::~BitMask(){
-    delete masks;
-}
 
-void BitMask::set( int bit, bool value ) {
-    if( bit >= size ){ return; }
-    int row = bit / mod;
-    int col = bit % mod;
-    if( value == 1){
-        masks[row] |= (int) value << col;
-    }
-    else if( value == 0 ){
-        masks[row] &= (int) value << col;
-    }
-    else{
-        assert(false);
-    }
-}
-
-bool BitMask::get( int bit ){
-    int row = bit / mod;
-    int col = bit % mod;
-    return (bool) ((masks[row] >> col) & 1);
-}
-
+///////////////////////////////////////////////////////////////////////////
 
 GoState::GoState( string name, int dimension, bool ashallow ){
     this->name = name;
@@ -69,7 +34,6 @@ GoState::GoState( string name, int dimension, bool ashallow ){
         else{
             board[i] = EMPTY; 
             num_open++;
-            //open_positions.insert(i);
         }
     }
     player = BLACK;
@@ -110,8 +74,6 @@ GoState* GoState::copy( bool ashallow ) {
         s->board[i] = board[i];
     }
 
-    //set<int> op (open_positions.begin(), open_positions.end());
-    //s->open_positions = op;
     s->num_open = num_open;
 
     s->player = player;
@@ -254,13 +216,11 @@ void GoState::setBoard( int ix, COLOR color ){
     if( ix >= boardsize || board[ix] == OFFBOARD ){ return; }
 
     if( color == EMPTY ){
-        //open_positions.insert(ix);
         num_open++;
     }
     else{
         assert( board[ix] == EMPTY );
         num_open--;
-        //open_positions.erase(ix);
     }
     board[ix] = color;
 }
@@ -270,7 +230,6 @@ void* GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
     for( int dir=0; dir<adjacency; dir++ ){
         to_fill[dir] = neighbor(ix, (DIRECTION) dir);
     }
-    //return neighbor_array;
 }
 
 void GoState::filterByColor( int* to_fill, 
@@ -305,25 +264,18 @@ bool GoState::floodFill( int* to_fill,
                        COLOR* stop_color_array, 
                        int stop_len ){
 
-    //set<int> marked;
-    //set<int> on_queue;
     BitMask marked (boardsize);
     BitMask on_queue(boardsize);
-    queue<int> q;
-    q.push(epicenter_ix);
+    Queue queue( boardsize );
+
+    queue.push( epicenter_ix );
     
-    //for(int i=0; i<boardsize; i++){
-    //q.push(i);
-    //}
     int neighbs[adjacency];
     bool stop_color_not_encountered = true;
 
-    while( !q.empty() ){
-        int ix = q.front();
-        q.pop();
-        //marked.insert(ix);
+    while( !queue.isEmpty() ){
+        int ix = queue.pop();
         marked.set(ix,true);
-        //cout << "inserting: " << ix << endl;
  
         neighborsOf( neighbs, 
                      ix, 
@@ -340,7 +292,6 @@ bool GoState::floodFill( int* to_fill,
 
         bool stop_color_is_in_neighbs = filtered_len > 0;
         if( stop_color_is_in_neighbs ){
-            //marked.clear();
             stop_color_not_encountered = false;
             break;
         }
@@ -358,9 +309,7 @@ bool GoState::floodFill( int* to_fill,
             for( int faix=0; faix < filtered_len; faix++ ){
                 int ix = filtered_array[faix];
                 if( !marked.get(ix) && !on_queue.get(ix) ){
-//marked.find( ix ) == marked.end() && 
-                    //cout << "pushing: " << ix << endl;
-                    q.push(ix);
+                    queue.push(ix);
                     on_queue.set(ix,true);
                 }
             }
@@ -369,10 +318,6 @@ bool GoState::floodFill( int* to_fill,
     
     //populate to_fill; kinda of unnecassay just did to keep use pattern same
     int i = 0;
-    //set<int>::iterator it;
-    //for( it = marked.begin(); it != marked.end(); it++ ){
-    //to_fill[i++] = *it;
-    //}
     for( int j=0; j<boardsize; j++ ){
         if( marked.get(j) ){
             to_fill[i++] = j;
@@ -380,10 +325,6 @@ bool GoState::floodFill( int* to_fill,
     }
     *to_fill_len = i;
 
-    //marked.clear();
-    queue<int> empty;
-    std::swap( q, empty );
-    //delete neighbs;
     return stop_color_not_encountered;
 }
 
@@ -413,13 +354,14 @@ bool GoState::isSuicide( int action ){
     //(Not considering moves that make space by capturing opponent first
     // these pieces should be removed beforehand)
     bool left_with_no_liberties = false;
-    set<int> marked;
+    //set<int> marked;
+    BitMask marked( boardsize );
     COLOR stop_array[1] = {EMPTY};
 
     for( int i=0; i < filtered_len; i++ ){
         int nix = filtered[i];
         //cout << "nix: " << nix << endl;
-        if( marked.find(nix) != marked.end() ){ continue; }
+        if( marked.get(nix) ){ continue; }
 
         int flood_len = 0;
         bool fill_completed = 
@@ -433,7 +375,8 @@ bool GoState::isSuicide( int action ){
         if( fill_completed ){
             for( int j=0; j < flood_len; j++ ){
                 //cout << "marking: " << floodfill_array[j] << endl;
-                marked.insert( floodfill_array[j] );
+                //marked.insert( floodfill_array[j] );
+                marked.set( floodfill_array[j], true );
             }
         }
         //cout << "nix: " << nix << "no_liber: " << (flood_len > 0) << endl;

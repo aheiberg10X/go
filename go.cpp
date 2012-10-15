@@ -1,6 +1,8 @@
 #include "gostate.h"
 #include "godomain.cpp"
 #include "mcts.h"
+#include "queue.cpp"
+#include "bitmask.cpp"
 
 #include <assert.h>
 #include <iostream>
@@ -10,6 +12,20 @@ using namespace std;
 int main(){
 
     srand(time(NULL));
+
+    if( false ){
+        Queue q (4);
+        q.push(7);
+        q.push(8);
+        q.push(9);
+        q.push(10);
+        cout << q.pop() << endl;
+        cout << q.pop() << endl;
+        cout << q.pop() << endl;
+        cout << q.pop() << endl;
+        cout << q.isEmpty() << endl;
+    }
+
 
     if( false ){
         BitMask bm( 45 );
@@ -100,15 +116,16 @@ int main(){
         //count++;
         //}
         
-        bool to_exclude[state->boardsize];
-        for(int i=0; i<state->boardsize; i++){
-           to_exclude[i] = false;
-        }
+        //bool to_exclude[state->boardsize];
+        //for(int i=0; i<state->boardsize; i++){
+        //to_exclude[i] = false;
+        //}
+        BitMask to_exclude (state->boardsize);
         while( ! gd.isTerminal( *p_uncast_state ) ){
             //cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
             //cout << "current state: " << state->toString() << endl;
             //cout << "last state: " << state->past_states[NUM_PAST_STATES-1]->toString() << endl;
-            int raction = gd.randomAction( p_uncast_state, to_exclude );
+            int raction = gd.randomAction( p_uncast_state, &to_exclude );
             cout << "\napplying rand act: " << raction << " to: \n" << state->toString() << endl;
             gd.applyAction( p_uncast_state, raction, true );
 

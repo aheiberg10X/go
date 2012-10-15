@@ -74,14 +74,15 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     int action;
     //cout << "marked: " << node->marked << "terminal: " << domain->isTerminal( state ) << endl;
     MCTS_Node* node = root_node;
-    bool empty_to_exclude[node->num_actions];
-    for(int i=0; i<node->num_actions; i++ ){
-        empty_to_exclude[i] = false;
-    }
+    //bool empty_to_exclude[node->num_actions];
+    //for(int i=0; i<node->num_actions; i++ ){
+    //empty_to_exclude[i] = false;
+    //}
+    BitMask empty_to_exclude (node->num_actions);
 
     while( node->marked && !domain->isTerminal( *p_uncast_state ) ){
         action = domain->randomAction( p_uncast_state, 
-                                       empty_to_exclude );
+                                       &empty_to_exclude );
         //if( !domain->isChanceAction ){
         //}
         //else{
@@ -141,16 +142,17 @@ void MCTS::defaultPolicy( int* rewards,
     int action;
 
     GoState* s = ((GoState*) *p_uncast_state);
-    bool to_exclude[s->boardsize];
-    for( int i=0; i<s->boardsize; i++ ){
-        to_exclude[i] = false;
-    }
+    BitMask to_exclude( s->boardsize );
+    //bool to_exclude[s->boardsize];
+    //for( int i=0; i<s->boardsize; i++ ){
+    //to_exclude[i] = false;
+    //}
     while( !domain->isTerminal( *p_uncast_state) ){
         if( count > 1000 ){
             cout << "probably in loop" << endl;
             break;
         }
-        action = domain->randomAction( p_uncast_state, to_exclude );
+        action = domain->randomAction( p_uncast_state, &to_exclude );
 
         GoState* state = (GoState*) *p_uncast_state;
         //cout << "applying: " << action << " to:" << state->toString() << endl;

@@ -6,10 +6,9 @@
 #include <string>
 //#include <map>
 #include "gostate.h"
-//TODO: replace marked with bitmask array
-#include <set>
 #include <assert.h>
 #include <iostream>
+
 //TODO: will have to write own shuffling algorithm for CUDA kernel
 #include <algorithm>
 /*#include "goaction.h"*/
@@ -318,11 +317,12 @@ public :
 
     //return an unsigned action, i.e an ix in the board
     int randomAction( void** p_uncast_state,
-                      bool* to_exclude ){
+                      BitMask* to_exclude ){
+            //bool* to_exclude ){
 
         GoState* state = (GoState*) *p_uncast_state;
         //get a random shuffle of the empty intersections
-        set<int>::iterator it;
+        //set<int>::iterator it;
         int size = state->num_open; //state->open_positions.size();
         int empty_ixs[ size ];
 
@@ -351,7 +351,8 @@ public :
 
             if( is_legal ){
                 legal_moves_available = true;
-                if( to_exclude[candidate] == false ){
+                //if( to_exclude[candidate] == false ){
+                if( !to_exclude->get(candidate) ){
                     //return action;
                     return candidate;
                 }
