@@ -44,20 +44,21 @@ int MCTS::search( void* root_state ){
     //TODO
     //print out info on each child for debugging
     assert( root_node->is_root );
-    MCTS_Node* child;
-    for( int i=0; i<root_node->num_actions; i++){
-        if( root_node->tried_actions->get(i) ){
-            child = root_node->children[i];
-            cout << "action: " << i << " visit count: " << child->visit_count << " total_rewards: ";
-            for( int j=0; j< num_players; j++ ){
-                cout << child->total_rewards[j] << ", ";
-            }
-            cout << endl;
-        }
-        else{
-            cout << "didn't try: " << i << endl;
-        }
-    }
+    //MCTS_Node* child;
+    //for( int i=0; i<root_node->num_actions; i++){
+    //if( root_node->tried_actions->get(i) ){
+    //child = root_node->children[i];
+    //cout << "action: " << i << " EV:";
+    //// << child->visit_count << " total_rewards: ";
+    //for( int j=0; j< num_players; j++ ){
+    //cout << (double) child->total_rewards[j] / child->visit_count << ", ";
+    //}
+    //cout << endl;
+    //}
+    //else{
+    //cout << "didn't try: " << i << endl;
+    //}
+    //}
 
     int player_ix = domain->getPlayerIx(root_state);
     MCTS_Node* best_child = bestChild( root_node, root_state, player_ix );
@@ -125,17 +126,39 @@ int MCTS::scoreNode( void*      state,
                      MCTS_Node* parent, 
                      int        player_ix, 
                      double     balancing_constant ){
+    assert(false);
     return 42;
 }
 
 MCTS_Node* MCTS::bestChild( MCTS_Node* parent, 
                             void*      pstate, 
                             int        player_ix ){
+    bool uninit = true;
+    int max_ix = 0;
+    double max_score = 0;
+    double score;
     GoState* gs = (GoState*) pstate;
-    for( int ix=0; ix<boardsize; ix++ ){
+    MCTS_Node* child;
+
+    cout << "player_ix: " << player_ix << endl;
+    for( int ix=0; ix<gs->boardsize; ix++ ){
         if( parent->tried_actions->get(ix) ){
-            parent->children[ix]
+            child = parent->children[ix];
+            score = ((double) child->total_rewards[player_ix]) / child->visit_count;
+            if( uninit ){
+                max_ix = ix;
+                max_score = score;
+                uninit = false;
+            }
+            else{
+                if( score > max_score ){
+                    max_ix = ix;
+                    max_score = score;
+                }
+            }
         }
+    }
+    return parent->children[max_ix];
 
 }
 
