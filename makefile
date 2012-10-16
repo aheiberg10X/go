@@ -1,4 +1,4 @@
-CFLAGS = -pg
+CFLAGS = #-pg
 
 all: clean go
 

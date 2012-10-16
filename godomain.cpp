@@ -11,7 +11,6 @@
 
 //TODO: will have to write own shuffling algorithm for CUDA kernel
 #include <algorithm>
-/*#include "goaction.h"*/
 
 using namespace std;
 
@@ -326,19 +325,39 @@ public :
         int size = state->num_open; //state->open_positions.size();
         int empty_ixs[ size ];
 
-        int i = 0;
         //for( it = state->open_positions.begin();
         //it != state->open_positions.end();
         //it++ ){
         //empty_ixs[i++] = *it;
         //}
+
+
+        int i = 0;
+        int j;
+        //can shuffle randomly as we insert...
         for( int ix=0; ix<state->boardsize; ix++ ){
             if( state->board[ix] == EMPTY ){
-                empty_ixs[i++] = ix;
+                if( i == 0 ){
+                    empty_ixs[0] = ix;
+                }
+                else{
+                    j = rand() % i;
+                    empty_ixs[i] = empty_ixs[j];
+                    empty_ixs[j] = ix;
+                }
+                i++;
+                //empty_ixs[i++] = ix;
             }
         }
-        random_shuffle( &empty_ixs[0], 
-                        &empty_ixs[ size ] );
+        //random shuffle
+        //int j, tmp;
+        //for( int i=size-1; i>0; i-- ){
+        //tmp = empty_ixs[j];
+        //empty_ixs[j] = empty_ixs[i];
+        //empty_ixs[i] = tmp;
+        //}
+        //random_shuffle( &empty_ixs[0], 
+        //&empty_ixs[ size ] );
 
         //try each one to see if legal
         bool legal_moves_available = false;

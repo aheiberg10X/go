@@ -42,18 +42,28 @@ int main(){
     }
 
 
-    if( false ){
-        GoState* gs = new GoState( "s", 9, false );
+    if( true ){
         Domain* domain = (Domain*) new GoDomain();
+        GoState* gs = new GoState( "s", 4, false );
+        void** p_uncast_state = (void**) &gs;
         MCTS mcts(domain);
-        int best_action = mcts.search( (void*) gs );
+
+        while( !domain->isTerminal( *p_uncast_state ) ){
+            int best_action = mcts.search( *p_uncast_state );
+            cout << "Best Action: " << best_action << endl;
+            break;
+            //domain->applyAction( p_uncast_state, best_action, true );
+            //cout << "Applying action: " << best_action << endl;
+            //cout << "Resulting state: " << ((GoState* ) *p_uncast_state)->toString() << endl;
+            //cout << endl;
+        }
         
     }
     
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
     //work in fixed memory
-    if( true ){
+    if( false ){
 
         string name = "original";
         GoState* state = new GoState( name, 9, false );

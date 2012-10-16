@@ -11,11 +11,10 @@
 //will need to come out
 
 using namespace std;
-//TODO move BItmask to own file
-
 
 ///////////////////////////////////////////////////////////////////////////
-
+//TODO 
+//may get speed up if maintain queue of open_positions
 GoState::GoState( string name, int dimension, bool ashallow ){
     this->name = name;
     dim = dimension;

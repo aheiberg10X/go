@@ -24,9 +24,8 @@ int MCTS::search( void* root_state ){
     int rewards[num_players];
 
     int iterations = 0;
-    cout << "hi" << endl;
-    while( iterations < 1000 ){
-        cout << endl << endl << "iteration: " << iterations << endl;
+    while( iterations < 100 ){
+        //cout << endl << endl << "iteration: " << iterations << endl;
         state = domain->copyState(root_state);
         //cout << "\n\nroot state: " << ((GoState*) state)->toString() << endl;
 
@@ -44,23 +43,25 @@ int MCTS::search( void* root_state ){
 
     //TODO
     //print out info on each child for debugging
-    //assert( root_node->is_root );
-    //map<int,MCTS_Node*>::iterator it;
-    //for( it  = root_node->d_action_child.begin(); 
-    //it != root_node->d_action_child.end();
-    //it++ ){
-    ////cout << "action: " << (*it).first <<
-    ////"\nvisit count: " << (*it).second->visit_count << endl;
-    ////cout << "rewards: ";
-    //for( int i=0; i < num_players; i++) {
-    ////cout << (*it).second->total_rewards[i] << ", ";
-    //}
-    ////cout << endl;
-    //}
+    assert( root_node->is_root );
+    MCTS_Node* child;
+    for( int i=0; i<root_node->num_actions; i++){
+        if( root_node->tried_actions->get(i) ){
+            child = root_node->children[i];
+            cout << "action: " << i << " visit count: " << child->visit_count << " total_rewards: ";
+            for( int j=0; j< num_players; j++ ){
+                cout << child->total_rewards[j] << ", ";
+            }
+            cout << endl;
+        }
+        else{
+            cout << "didn't try: " << i << endl;
+        }
+    }
 
     int player_ix = domain->getPlayerIx(root_state);
     MCTS_Node* best_child = bestChild( root_node, root_state, player_ix );
-    cout << "num_nodes created: " << MCTS_Node::num_nodes << endl;
+    //cout << "num_nodes created: " << MCTS_Node::num_nodes << endl;
     return best_child->action;
 }
 
@@ -94,7 +95,7 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
 
         //if( node->tried.find(action) != node->tried.end() ){
         //int ix = domain
-        if( node->tried_actions[action] ){
+        if( node->tried_actions->get(action) ){
             node = node->children[action];
         }
         else{
@@ -130,7 +131,12 @@ int MCTS::scoreNode( void*      state,
 MCTS_Node* MCTS::bestChild( MCTS_Node* parent, 
                             void*      pstate, 
                             int        player_ix ){
-    return parent;
+    GoState* gs = (GoState*) pstate;
+    for( int ix=0; ix<boardsize; ix++ ){
+        if( parent->tried_actions->get(ix) ){
+            parent->children[ix]
+        }
+
 }
 
 
