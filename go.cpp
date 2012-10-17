@@ -55,7 +55,7 @@ int main(){
             cout << "Applying action: " << best_action << endl;
             cout << "Resulting state: " << ((GoState* ) *p_uncast_state)->toString() << endl;
             cout << endl;
-            cin.ignore();
+            //cin.ignore();
         }
         
     }

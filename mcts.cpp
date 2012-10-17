@@ -24,7 +24,7 @@ int MCTS::search( void* root_state ){
     int rewards[num_players];
 
     int iterations = 0;
-    while( iterations < 100 ){
+    while( iterations < 10000 ){
         //cout << endl << endl << "iteration: " << iterations << endl;
         state = domain->copyState(root_state);
         //cout << "\n\nroot state: " << ((GoState*) state)->toString() << endl;
