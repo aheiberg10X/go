@@ -14,7 +14,6 @@ MCTS::MCTS( Domain* d ){
 //returns an action
 int MCTS::search( void* root_state ){
     assert( !domain->isChanceAction( root_state ) );
-    
     int num_players = domain->getNumPlayers( root_state );
     int num_actions = domain->getNumActions( root_state );
     MCTS_Node* root_node = new MCTS_Node( num_players, num_actions );
@@ -24,9 +23,9 @@ int MCTS::search( void* root_state ){
     int rewards[num_players];
 
     int iterations = 0;
-    while( iterations < 10000 ){
-        //cout << endl << endl << "iteration: " << iterations << endl;
+    while( iterations < 1000 ){
         state = domain->copyState(root_state);
+        //cout << endl << endl << "iteration: " << iterations << endl;
         //cout << "\n\nroot state: " << ((GoState*) state)->toString() << endl;
 
         node = treePolicy( root_node, (void**) &state );
@@ -39,6 +38,7 @@ int MCTS::search( void* root_state ){
 
         backprop( node, rewards, num_players );
         iterations += 1; 
+        domain->deleteState( state );
     }
 
     //TODO
@@ -60,10 +60,14 @@ int MCTS::search( void* root_state ){
     //}
     //}
 
-    int player_ix = domain->getPlayerIx(root_state);
-    MCTS_Node* best_child = bestChild( root_node, root_state, player_ix );
-    //cout << "num_nodes created: " << MCTS_Node::num_nodes << endl;
-    return best_child->action;
+    int player_ix = domain->getPlayerIx(state);
+    MCTS_Node* best_child = bestChild( root_node, player_ix );
+    int best_action = best_child->action;
+    cout << "deleteing root_node" << endl;
+    delete root_node;
+    cout << "num_nodes created: " << MCTS_Node::num_nodes_created << endl;
+    cout << "num_nodes destoryed: " << MCTS_Node::num_nodes_destroyed << endl;
+    return best_action;
 }
 
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
@@ -131,17 +135,17 @@ int MCTS::scoreNode( void*      state,
 }
 
 MCTS_Node* MCTS::bestChild( MCTS_Node* parent, 
-                            void*      pstate, 
+        //void*      pstate, 
                             int        player_ix ){
     bool uninit = true;
     int max_ix = 0;
     double max_score = 0;
     double score;
-    GoState* gs = (GoState*) pstate;
+    //GoState* gs = (GoState*) pstate;
     MCTS_Node* child;
 
     cout << "player_ix: " << player_ix << endl;
-    for( int ix=0; ix<gs->boardsize; ix++ ){
+    for( int ix=0; ix < parent->num_actions; ix++ ){
         if( parent->tried_actions->get(ix) ){
             child = parent->children[ix];
             score = ((double) child->total_rewards[player_ix]) / child->visit_count;

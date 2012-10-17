@@ -37,7 +37,7 @@ public :
                    double     balancing_constant );
 
     MCTS_Node* bestChild( MCTS_Node* parent, 
-                          void*      pstate, 
+            /*void*      pstate, */
                           int        player_ix );
 
     void defaultPolicy( int*    rewards, 

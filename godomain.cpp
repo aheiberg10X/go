@@ -45,6 +45,12 @@ public :
         return (void*) gs->copy( false);
     };
 
+    void deleteState( void* state ) {
+        GoState* gs = (GoState*) state;
+        delete gs;
+        return;
+    }
+
     bool applyAction( void** p_uncast_state, 
                       int action,
                       bool side_effects ){

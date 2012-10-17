@@ -8,7 +8,8 @@
 
 class MCTS_Node {
 public :
-    static int num_nodes;
+    static int num_nodes_created;
+    static int num_nodes_destroyed;
     bool is_root;
     MCTS_Node* parent;
     int action;
@@ -43,7 +44,8 @@ public :
 
     ~MCTS_Node();
     
-    static void incNumNodes();
+    static void incCreated();
+    static void incDestroyed();
 
 };
 #endif

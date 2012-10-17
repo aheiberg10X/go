@@ -5,7 +5,7 @@
 using namespace std;
 
 MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
-    incNumNodes();
+    incCreated();
     num_players = anum_players;
     num_actions = anum_actions;
     //tried_actions = new bool[anum_actions];
@@ -18,10 +18,16 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     children = new MCTS_Node* [anum_actions];
     is_root = true;
     marked = true;
+    
+    total_rewards = new int[num_players];
+    for( int i=0; i < num_players; i++ ){
+        total_rewards[i] = 0;
+    }
+
 }
 
 MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
-    incNumNodes();
+    incCreated();
     is_root = false;
     marked = false;
     parent = aparent;
@@ -62,24 +68,36 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     fully_expanded = false;
 }
 
-int MCTS_Node::num_nodes = 0;
+int MCTS_Node::num_nodes_created = 0;
+int MCTS_Node::num_nodes_destroyed = 0;
 
-void MCTS_Node::incNumNodes(){
-    num_nodes++;
+void MCTS_Node::incCreated(){
+    num_nodes_created++;
 }
+void MCTS_Node::incDestroyed(){
+    num_nodes_destroyed++;
+}
+    
 //void MCTS_Node::setNumNodes(){
 //num_nodes = 0;
 //}
 
 MCTS_Node::~MCTS_Node(){
-    cout << "NODE DELETED" << endl;
-    delete total_rewards;
-    //tried.clear();
-    //map<int,MCTS_Node*>::iterator it;
-    //for( it=d_action_child.begin(); it!=d_action_child.end(); it++){
-    //delete (*it).second;
-    //}
-    //d_action_child.clear();
+    incDestroyed();
+    //cout << "NODE DELETED" << endl;
+    delete[] total_rewards;
+    //cout << "wat" << endl;
+    for( int i=0; i<num_actions; i++ ){
+        if( tried_actions->get(i) ){
+            //cout << "going" << endl;
+            delete children[i];
+            //cout << "on" << endl;
+        }    
+        //else{
+        //delete children[i];
+        //}
+    }
+    delete[] children;
     delete tried_actions;
-    delete children;
+    //delete children;
 }

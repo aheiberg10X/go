@@ -17,6 +17,7 @@ class Domain {
         virtual int getPlayerIx( void* state ) = 0;
 
         virtual void* copyState( void* state ) = 0;
+        virtual void deleteState( void* state ) = 0;
 
         virtual bool applyAction( void** state, 
                                   int action,
