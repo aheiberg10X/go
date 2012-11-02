@@ -187,7 +187,7 @@ void MCTS::defaultPolicy( int* rewards,
         }
         action = domain->randomAction( p_uncast_state, &to_exclude );
 
-        GoState* state = (GoState*) *p_uncast_state;
+        //GoState* state = (GoState*) *p_uncast_state;
         //cout << "applying: " << action << " to:" << state->toString() << endl;
 
         domain->applyAction( p_uncast_state, action, true );

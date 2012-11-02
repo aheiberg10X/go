@@ -10,6 +10,10 @@
 using namespace std;
 
 int main(){
+    cout << sizeof(COLOR) << endl;
+    cout << sizeof(int) << endl;
+    cout << sizeof(char) << endl;
+    cout << sizeof(GoState) << endl;
 
     srand(time(NULL));
 
@@ -42,9 +46,9 @@ int main(){
     }
 
 
-    if( true ){
+    if( false ){
         Domain* domain = (Domain*) new GoDomain();
-        GoState* gs = new GoState( "s", 9, false );
+        GoState* gs = new GoState( 9, false );
         void** p_uncast_state = (void**) &gs;
         MCTS mcts(domain);
 
@@ -65,8 +69,8 @@ int main(){
     //work in fixed memory
     if( false ){
 
-        string name = "original";
-        GoState* state = new GoState( name, 9, false );
+        //string name = "original";
+        GoState* state = new GoState( 9, false );
         void** p_uncast_state = (void**) &state;
 
         //int filtered_array[4];

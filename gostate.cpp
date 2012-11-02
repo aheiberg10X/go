@@ -15,8 +15,8 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////////////
 //TODO 
 //may get speed up if maintain queue of open_positions
-GoState::GoState( string name, int dimension, bool ashallow ){
-    this->name = name;
+GoState::GoState( /*string name,*/ int dimension, bool ashallow ){
+    //this->name = name;
     dim = dimension;
     bigdim = dim+2;
     boardsize = (bigdim)*(bigdim);
@@ -42,9 +42,9 @@ GoState::GoState( string name, int dimension, bool ashallow ){
     if( ! ashallow ){
         shallow = false;
         for( int i=0; i < NUM_PAST_STATES; i++ ){
-            stringstream ss;
-            ss << name+"_ps" << i;
-            past_states[i] = new GoState( ss.str(), dim, true);
+            //stringstream ss;
+            //ss << name+"_ps" << i;
+            past_states[i] = new GoState( /*ss.str(),*/ dim, true);
         } 
     }
     else{
@@ -67,7 +67,7 @@ GoState::~GoState(){
 }
 
 GoState* GoState::copy( bool ashallow ) {
-    GoState* s = new GoState( "copy", dim, true );
+    GoState* s = new GoState( dim, true );
 
     for( int i=0; i<boardsize; i++ ){
         s->board[i] = board[i];
@@ -161,7 +161,14 @@ int GoState::neighbor(int ix, DIRECTION dir){
 }
 
 int GoState::ix2action( int ix, COLOR player ){
-    return ix * (int) player;
+    int parity;
+    if( player == WHITE ){
+        parity = 1;
+    }
+    else{
+        parity = -1;
+    }
+    return ix * parity;
 }
 
 int GoState::action2ix( int action ){
@@ -192,13 +199,13 @@ int GoState::coord2ix( int i, int j ){
     return bigdim*i + j;
 }
 
-string GoState::ix2coord( int ix ){
-    int j = ix % bigdim;
-    int i = ix / bigdim;
-    stringstream out;
-    out << i << "," << j;
-    return out.str();
-}
+//string GoState::ix2coord( int ix ){
+//int j = ix % bigdim;
+//int i = ix / bigdim;
+//stringstream out;
+//out << i << "," << j;
+//return out.str();
+//}
 
 bool GoState::isPass( int action ){
     return action == 0;

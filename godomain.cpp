@@ -322,79 +322,71 @@ public :
 
     //return an unsigned action, i.e an ix in the board
     int randomAction( void** p_uncast_state,
-                      BitMask* to_exclude ){
-            //bool* to_exclude ){
+                  BitMask* to_exclude ){
+        //bool* to_exclude ){
 
-        GoState* state = (GoState*) *p_uncast_state;
-        //get a random shuffle of the empty intersections
-        //set<int>::iterator it;
-        int size = state->num_open; //state->open_positions.size();
-        int empty_ixs[ size ];
+    GoState* state = (GoState*) *p_uncast_state;
+    //get a random shuffle of the empty intersections
+    //set<int>::iterator it;
+    int size = state->num_open; //state->open_positions.size();
+    int empty_ixs[ size ];
 
-        //for( it = state->open_positions.begin();
-        //it != state->open_positions.end();
-        //it++ ){
-        //empty_ixs[i++] = *it;
-        //}
+    //for( it = state->open_positions.begin();
+    //it != state->open_positions.end();
+    //it++ ){
+    //empty_ixs[i++] = *it;
+    //}
 
 
-        int i = 0;
-        int j;
-        //can shuffle randomly as we insert...
-        for( int ix=0; ix<state->boardsize; ix++ ){
-            if( state->board[ix] == EMPTY ){
-                if( i == 0 ){
-                    empty_ixs[0] = ix;
-                }
-                else{
-                    j = rand() % i;
-                    empty_ixs[i] = empty_ixs[j];
-                    empty_ixs[j] = ix;
-                }
-                i++;
-                //empty_ixs[i++] = ix;
+    int i = 0;
+    int j;
+    //can shuffle randomly as we insert...
+    for( int ix=0; ix<state->boardsize; ix++ ){
+        if( state->board[ix] == EMPTY ){
+            if( i == 0 ){
+                empty_ixs[0] = ix;
             }
-        }
-        //random shuffle
-        //int j, tmp;
-        //for( int i=size-1; i>0; i-- ){
-        //tmp = empty_ixs[j];
-        //empty_ixs[j] = empty_ixs[i];
-        //empty_ixs[i] = tmp;
-        //}
-        //random_shuffle( &empty_ixs[0], 
-        //&empty_ixs[ size ] );
-
-        //try each one to see if legal
-        bool legal_moves_available = false;
-        int candidate, action;
-        for( int j=0; j<size; j++ ){
-            candidate = empty_ixs[j];
-            //action = state->ix2action( candidate, state->player );
-            bool is_legal = applyAction( p_uncast_state, candidate, false );
-            state = (GoState*) *p_uncast_state;
-
-            if( is_legal ){
-                legal_moves_available = true;
-                //if( to_exclude[candidate] == false ){
-                if( !to_exclude->get(candidate) ){
-                    //return action;
-                    return candidate;
-                }
+            else{
+                j = rand() % i;
+                empty_ixs[i] = empty_ixs[j];
+                empty_ixs[j] = ix;
             }
-        }
-
-        if( legal_moves_available ){ //but all were excluded...
-            return excluded_action;
-        }
-        else {
-            return PASS;
+            i++;
         }
     }
-    
-    bool fullyExpanded( int action ){
-        return action == excluded_action;
+    //random_shuffle( &empty_ixs[0], 
+    //&empty_ixs[ size ] );
+
+    //try each one to see if legal
+    bool legal_moves_available = false;
+    int candidate, action;
+    for( int j=0; j<size; j++ ){
+        candidate = empty_ixs[j];
+        //action = state->ix2action( candidate, state->player );
+        bool is_legal = applyAction( p_uncast_state, candidate, false );
+        //state = (GoState*) *p_uncast_state;
+
+        if( is_legal ){
+            legal_moves_available = true;
+            //if( to_exclude[candidate] == false ){
+            if( !to_exclude->get(candidate) ){
+                //return action;
+                return candidate;
+            }
+        }
     }
+
+    if( legal_moves_available ){ //but all were excluded...
+        return excluded_action;
+    }
+    else {
+        return PASS;
+    }
+}
+
+bool fullyExpanded( int action ){
+    return action == excluded_action;
+}
 
     bool isChanceAction( void* state ){
         return false;

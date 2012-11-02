@@ -9,7 +9,9 @@
 /*#include <hash_map>*/
 
 /*using namespace std;*/
-
+//TODO
+//mem gains to be had by getting rid of ENUM type and replacing 'board' with 
+//char array.  ENUMs are converted to int, which take 4 bytes, char's take 1
 enum COLOR {
     BLACK = -1,
     WHITE = 1,
@@ -31,14 +33,16 @@ enum DIRECTION {
 const int PASS = 0;
 
 const int NUM_PAST_STATES = 10;
+const int BOARD_SIZE = 9;
 
 class GoState {
     public :
-        std::string name;
+        /*std::string name;*/
         int dim;
         int bigdim;
         int boardsize;
         COLOR* board;
+        char board2[BOARD_SIZE*BOARD_SIZE];
         int action;
         bool shallow;
         /*std::unordered_set<int> test;*/
@@ -54,7 +58,7 @@ class GoState {
         //TODO: past states
         
         //ctor
-        GoState ( std::string, int, bool );
+        GoState ( /*std::string,*/ int, bool );
         ~GoState();
         
         GoState* copy(bool shallow);
@@ -73,7 +77,7 @@ class GoState {
         COLOR  action2color(int);
         int    ix2color(int);
         int    coord2ix( int i, int j );
-        std::string ix2coord( int ix );
+        /*std::string ix2coord( int ix );*/
         bool isPass( int action );
         int coordColor2Action( int i, int j, COLOR color );
         int ixColor2Action( int ix, COLOR color );
