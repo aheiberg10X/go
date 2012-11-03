@@ -78,7 +78,6 @@ MCTS_Node* MCTS::treePolicy( MCTS_Node* node,
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
                                void**     p_uncast_state ){
     int action;
-    //cout << "marked: " << node->marked << "terminal: " << domain->isTerminal( state ) << endl;
     MCTS_Node* node = root_node;
     //bool empty_to_exclude[node->num_actions];
     //for(int i=0; i<node->num_actions; i++ ){
@@ -96,7 +95,6 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
         domain->applyAction( p_uncast_state, 
                              action, 
                              true );
-
 
         //if( node->tried.find(action) != node->tried.end() ){
         //int ix = domain

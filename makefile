@@ -11,11 +11,11 @@ mcts.o : mcts_node.o
 mcts_node.o: 
 	g++ -c mcts_node.cpp ${CFLAGS}
 
-godomain.o: stonestring.o
+godomain.o: 
 	g++ -c godomain.cpp ${CFLAGS}
 
-stonestring.o:
-	g++ -c stonestring.cpp ${CFLAGS}
+#stonestring.o:
+	#g++ -c stonestring.cpp ${CFLAGS}
 
 go.o:
 	g++ -c go.cpp ${CFLAGS}  

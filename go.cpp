@@ -10,9 +10,10 @@
 using namespace std;
 
 int main(){
-    cout << sizeof(COLOR) << endl;
+    //cout << sizeof(COLOR) << endl;
     cout << sizeof(int) << endl;
     cout << sizeof(char) << endl;
+    cout << sizeof(bool) << endl;
     cout << sizeof(GoState) << endl;
 
     srand(time(NULL));
@@ -46,11 +47,13 @@ int main(){
     }
 
 
-    if( false ){
+    if( true ){
         Domain* domain = (Domain*) new GoDomain();
-        GoState* gs = new GoState( 9, false );
+        GoState* gs = new GoState( false );
         void** p_uncast_state = (void**) &gs;
         MCTS mcts(domain);
+
+        cout << "yeesh" << endl;
 
         while( !domain->isTerminal( *p_uncast_state ) ){
             int best_action = mcts.search( *p_uncast_state );
@@ -59,7 +62,7 @@ int main(){
             cout << "Applying action: " << best_action << endl;
             cout << "Resulting state: " << ((GoState* ) *p_uncast_state)->toString() << endl;
             cout << endl;
-            //cin.ignore();
+            cin.ignore();
         }
         
     }
@@ -70,7 +73,7 @@ int main(){
     if( false ){
 
         //string name = "original";
-        GoState* state = new GoState( 9, false );
+        GoState* state = new GoState( false );
         void** p_uncast_state = (void**) &state;
 
         //int filtered_array[4];

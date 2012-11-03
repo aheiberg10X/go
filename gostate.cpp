@@ -15,12 +15,11 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////////////
 //TODO 
 //may get speed up if maintain queue of open_positions
-GoState::GoState( /*string name,*/ int dimension, bool ashallow ){
+GoState::GoState( /*string name, int dimension,*/ bool ashallow ){
     //this->name = name;
-    dim = dimension;
-    bigdim = dim+2;
-    boardsize = (bigdim)*(bigdim);
-    board = new COLOR[boardsize];
+    dim = DIM; //dimension;
+    bigdim = BIGDIM; //dim+2;
+    boardsize = BOARDSIZE; //(bigdim)*(bigdim);
     action = 42;
     num_open = 0;
     for( int i=0; i<boardsize; i++ ){
@@ -44,7 +43,7 @@ GoState::GoState( /*string name,*/ int dimension, bool ashallow ){
         for( int i=0; i < NUM_PAST_STATES; i++ ){
             //stringstream ss;
             //ss << name+"_ps" << i;
-            past_states[i] = new GoState( /*ss.str(),*/ dim, true);
+            past_states[i] = new GoState( /*ss.str(), dim,*/ true);
         } 
     }
     else{
@@ -53,7 +52,9 @@ GoState::GoState( /*string name,*/ int dimension, bool ashallow ){
 }
 
 GoState::~GoState(){
-    delete board;
+    //delete board;
+    //TODO
+    //will not be creating this using new anymore, will have to not delete
     delete floodfill_array;
     //open_positions.clear();
 
@@ -67,7 +68,7 @@ GoState::~GoState(){
 }
 
 GoState* GoState::copy( bool ashallow ) {
-    GoState* s = new GoState( dim, true );
+    GoState* s = new GoState( /*dim,*/ true );
 
     for( int i=0; i<boardsize; i++ ){
         s->board[i] = board[i];
@@ -89,12 +90,12 @@ GoState* GoState::copy( bool ashallow ) {
     return s;
 }
 
-COLOR GoState::flipColor( COLOR c ){
+char GoState::flipColor( char c ){
     assert( c == WHITE || c == BLACK );
     return (c == WHITE) ? BLACK : WHITE;
 }
 
-bool GoState::sameAs( COLOR* board, COLOR player ){
+bool GoState::sameAs( char* board, char player ){
     if( this->player != player ){
         return false;
     }
@@ -160,7 +161,7 @@ int GoState::neighbor(int ix, DIRECTION dir){
     }
 }
 
-int GoState::ix2action( int ix, COLOR player ){
+int GoState::ix2action( int ix, char player ){
     int parity;
     if( player == WHITE ){
         parity = 1;
@@ -175,7 +176,7 @@ int GoState::action2ix( int action ){
     return abs(action);
 }
 
-COLOR GoState::action2color( int action ){
+char GoState::action2color( int action ){
     assert( action != 0 );
     return (action > 0) ? WHITE : BLACK;
 }
@@ -184,12 +185,12 @@ int GoState::ix2color( int ix ){
     return (ix == OFFBOARD) ? OFFBOARD : board[ix];
 }
 
-int GoState::coordColor2Action( int i, int j, COLOR color ){
+int GoState::coordColor2Action( int i, int j, char color ){
     int ix = coord2ix(i,j);
     return ixColor2Action(ix, color);
 }
 
-int GoState::ixColor2Action( int ix, COLOR color ){
+int GoState::ixColor2Action( int ix, char color ){
     assert( color==WHITE || color==BLACK );
     int mod = (color == WHITE) ? 1 : -1;
     return ix*mod;
@@ -211,14 +212,14 @@ bool GoState::isPass( int action ){
     return action == 0;
 }
 
-void GoState::setBoard( int* ixs, int len, COLOR color ){
+void GoState::setBoard( int* ixs, int len, char color ){
     for( int i=0; i<len; i++ ){
         int ix = ixs[i];
         setBoard( ix, color );
     }
 }
 
-void GoState::setBoard( int ix, COLOR color ){
+void GoState::setBoard( int ix, char color ){
     if( ix >= boardsize || board[ix] == OFFBOARD ){ return; }
 
     if( color == EMPTY ){
@@ -231,7 +232,7 @@ void GoState::setBoard( int ix, COLOR color ){
     board[ix] = color;
 }
 
-void* GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
+void GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
     assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
         to_fill[dir] = neighbor(ix, (DIRECTION) dir);
@@ -242,12 +243,12 @@ void GoState::filterByColor( int* to_fill,
                              int* to_fill_len,
                              int* neighbs, 
                              int adjacency, 
-                             COLOR* color_array,
+                             char* color_array,
                              int filter_len ){
 
     *to_fill_len = 0;
     int fillix = 0;
-    COLOR ncolor;
+    char ncolor;
     for(int naix=0; naix<adjacency; naix++){
         int nix = neighbs[naix];
         ncolor = board[nix];
@@ -265,9 +266,9 @@ bool GoState::floodFill( int* to_fill,
                        int* to_fill_len, 
                        int epicenter_ix,
                        int adjacency,
-                       COLOR* flood_color_array, 
+                       char* flood_color_array, 
                        int filter_len,
-                       COLOR* stop_color_array, 
+                       char* stop_color_array, 
                        int stop_len ){
 
     BitMask marked (boardsize);
@@ -336,7 +337,7 @@ bool GoState::floodFill( int* to_fill,
 
 //assumes setBoard(action) already applied
 bool GoState::isSuicide( int action ){
-    COLOR color = action2color( action );
+    char color = action2color( action );
     int ix = action2ix( action );
     //cout << "ix: " << ix << endl;
     int adjacency = 4;
@@ -344,7 +345,7 @@ bool GoState::isSuicide( int action ){
     neighborsOf( neighbor_array, ix, adjacency );
 
     //same colored neighbors
-    COLOR colors[1] = {color};
+    char colors[1] = {color};
     int filtered[adjacency+1];
     int filtered_len;
     filterByColor( filtered, &filtered_len,
@@ -362,7 +363,7 @@ bool GoState::isSuicide( int action ){
     bool left_with_no_liberties = false;
     //set<int> marked;
     BitMask marked( boardsize );
-    COLOR stop_array[1] = {EMPTY};
+    char stop_array[1] = {EMPTY};
 
     for( int i=0; i < filtered_len; i++ ){
         int nix = filtered[i];

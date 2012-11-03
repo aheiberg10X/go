@@ -12,12 +12,12 @@
 //TODO
 //mem gains to be had by getting rid of ENUM type and replacing 'board' with 
 //char array.  ENUMs are converted to int, which take 4 bytes, char's take 1
-enum COLOR {
-    BLACK = -1,
-    WHITE = 1,
-    EMPTY = 0,
-    OFFBOARD = -7
-};
+/*enum COLOR {*/
+/*BLACK = -1,*/
+/*WHITE = 1,*/
+/*EMPTY = 0,*/
+/*OFFBOARD = -7*/
+/*};*/
 
 enum DIRECTION {
     N = 0,
@@ -33,7 +33,16 @@ enum DIRECTION {
 const int PASS = 0;
 
 const int NUM_PAST_STATES = 10;
-const int BOARD_SIZE = 9;
+/*const int DIM = 9;*/
+/*const big*/
+#define DIM 9
+#define BIGDIM 11
+#define BOARDSIZE 121
+
+#define BLACK 'b'
+#define WHITE 'w'
+#define EMPTY 'e'
+#define OFFBOARD 'o'
 
 class GoState {
     public :
@@ -41,8 +50,8 @@ class GoState {
         int dim;
         int bigdim;
         int boardsize;
-        COLOR* board;
-        char board2[BOARD_SIZE*BOARD_SIZE];
+        /*char* board;*/
+        char board[BOARDSIZE];
         int action;
         bool shallow;
         /*std::unordered_set<int> test;*/
@@ -53,12 +62,12 @@ class GoState {
         /*int num_open;*/
         int num_open;
 
-        COLOR player;
+        char player;
         GoState* past_states[NUM_PAST_STATES];
         //TODO: past states
         
         //ctor
-        GoState ( /*std::string,*/ int, bool );
+        GoState ( /*std::string, int,*/ bool );
         ~GoState();
         
         GoState* copy(bool shallow);
@@ -66,27 +75,27 @@ class GoState {
 
         std::string toString();
 
-        COLOR flipColor( COLOR c );
-        bool sameAs( COLOR* board, COLOR player );
+        char flipColor( char c );
+        bool sameAs( char* board, char player );
         bool sameAs( GoState s );
 
         void togglePlayer();
 
         int    action2ix(int);
-        int    ix2action(int, COLOR);
-        COLOR  action2color(int);
+        int    ix2action(int, char);
+        char  action2color(int);
         int    ix2color(int);
         int    coord2ix( int i, int j );
         /*std::string ix2coord( int ix );*/
         bool isPass( int action );
-        int coordColor2Action( int i, int j, COLOR color );
-        int ixColor2Action( int ix, COLOR color );
+        int coordColor2Action( int i, int j, char color );
+        int ixColor2Action( int ix, char color );
 
-        void setBoard( int ix, COLOR color );
-        void setBoard( int* ixs, int len, COLOR );
+        void setBoard( int ix, char color );
+        void setBoard( int* ixs, int len, char );
 
         int neighbor(int ix, DIRECTION dir);
-        void* neighborsOf( int* to_fill,
+        void neighborsOf( int* to_fill,
                            int ix, 
                            int adjacency );
 
@@ -94,7 +103,7 @@ class GoState {
                             int* to_fill_len,
                             int* neighbors_array, 
                             int adjacency,  
-                            COLOR* color_array, 
+                            char* color_array, 
                             int filter_len );
 
          bool floodFill( int* to_fill,
@@ -102,22 +111,25 @@ class GoState {
                         int epicenter_ix,
                         /*int* neighbor_array, */
                         int adjacency, 
-                        COLOR* color_array,
+                        char* color_array,
                         int color_len,
-                        COLOR* stop_colors, 
+                        char* stop_colors, 
                         int stop_len );
 
 
         bool isSuicide( int action );
-
+        
         //TODO
         //figure out if these static or member
         //might not be a good idea to uses these at all
         //functions call each other and sometimes use the same array
+        //
+        //hard allocate this, boardsize now fixed at compile time
         int* floodfill_array;
+
         int neighbor_array[8];
         int filtered_array[8];
-        COLOR color_array[3];
+        char color_array[3];
 
         /*private :*/
 

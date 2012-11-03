@@ -9,7 +9,10 @@
 #include <assert.h>
 #include <iostream>
 
-//TODO: will have to write own shuffling algorithm for CUDA kernel
+//TODO: need this for rand()
+//replace with #include <curand.h>
+//example
+//https://gist.github.com/803377
 #include <algorithm>
 
 using namespace std;
@@ -28,7 +31,7 @@ public :
     }
 
     int getPlayerIx( void* state ){
-        COLOR player = ((GoState*) state)->player;
+        char player = ((GoState*) state)->player;
         if( player == WHITE ){
             return 0;
         }
@@ -67,23 +70,23 @@ public :
         //The action parameter is really the index of the action to be taken
         //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
         int ix = action;
-        COLOR color = state->player;
+        char color = state->player;
         action = state->ix2action(action, color);
 
         if( ! state->isPass(action) ){
             //assert( state->action2color(action) == state->player );
-            //COLOR color = state->action2color(action);
+            //char color = state->action2color(action);
             state->setBoard( ix, color );
 
             //resolve captures
             int adjacency = 4;
             int neighbs[adjacency];
             state->neighborsOf( neighbs, ix, adjacency );
-            COLOR opp_color = state->flipColor(color); 
+            char opp_color = state->flipColor(color); 
 
             int opp_neighbs[adjacency];
             int opp_len = 0;
-            COLOR filter_array[1] = {opp_color};
+            char filter_array[1] = {opp_color};
             state->filterByColor( opp_neighbs, &opp_len,
                                   neighbs, adjacency,
                                   filter_array, 1 );
@@ -91,7 +94,7 @@ public :
             int num_removed = 0;
             for( int onix=0; onix < opp_len; onix++ ){
                 int floodfill_len = 0;
-                COLOR stop_color_array[1] = {EMPTY};
+                char stop_color_array[1] = {EMPTY};
                 bool fill_completed =
                 state->floodFill( state->floodfill_array, &floodfill_len,
                                   opp_neighbs[onix],
@@ -188,9 +191,9 @@ public :
             //}
 
             //int floodfill_array[boardsize];
-            //COLOR color = state->ix2color(ix);
-            //COLOR* flood_colors = {color};
-            //COLOR* stop_colors;
+            //char color = state->ix2color(ix);
+            //char* flood_colors = {color};
+            //char* stop_colors;
             //int floodfill_len = 0;
             //state->floodFill( floodfill_array,
                               //&floodfill_len,
@@ -241,7 +244,7 @@ public :
             //if so, set ncolor to be WHITE or BLACK
             //       set nix to be the ix of one such stone
             //else, the ix is not anybody's territory
-            COLOR ncolor;
+            char ncolor;
             int nix;
 
             int adjacency = 4;
@@ -251,7 +254,7 @@ public :
                                 adjacency );
             int white_neighbs[adjacency];
             int num_white_neighbs = 0;
-            COLOR filter_colors[1] = {WHITE};
+            char filter_colors[1] = {WHITE};
             state->filterByColor( white_neighbs, &num_white_neighbs,
                                   neighbs, adjacency, 
                                   filter_colors, 1 );
@@ -269,7 +272,7 @@ public :
             else if( has_black && ! has_white ) { ncolor = BLACK; }
             else                                { ncolor = EMPTY; }
 
-            //set nix to the first neighbor of the COLOR ncolor
+            //set nix to the first neighbor of the char ncolor
             for( int j=0; j<adjacency; j++ ){
                 nix = neighbs[j];
                 if( state->ix2color( nix ) == ncolor ){
@@ -283,8 +286,8 @@ public :
                 //is enough to just see a color adjacent to an empty
                 //assuming the rest bug free, it will be that colors territory
                 int floodfill_len = 0;
-                COLOR flood_colors[1] = {EMPTY};
-                COLOR stop_colors[1] = {state->flipColor(ncolor)};
+                char flood_colors[1] = {EMPTY};
+                char stop_colors[1] = {state->flipColor(ncolor)};
                 bool are_territories = 
                     state->floodFill( state->floodfill_array, &floodfill_len,
                                       ix, 
@@ -325,78 +328,77 @@ public :
                   BitMask* to_exclude ){
         //bool* to_exclude ){
 
-    GoState* state = (GoState*) *p_uncast_state;
-    //get a random shuffle of the empty intersections
-    //set<int>::iterator it;
-    int size = state->num_open; //state->open_positions.size();
-    int empty_ixs[ size ];
+        GoState* state = (GoState*) *p_uncast_state;
+        //get a random shuffle of the empty intersections
+        //set<int>::iterator it;
+        int size = state->num_open; //state->open_positions.size();
+        int empty_ixs[ size ];
 
-    //for( it = state->open_positions.begin();
-    //it != state->open_positions.end();
-    //it++ ){
-    //empty_ixs[i++] = *it;
-    //}
+        //for( it = state->open_positions.begin();
+        //it != state->open_positions.end();
+        //it++ ){
+        //empty_ixs[i++] = *it;
+        //}
 
 
-    int i = 0;
-    int j;
-    //can shuffle randomly as we insert...
-    for( int ix=0; ix<state->boardsize; ix++ ){
-        if( state->board[ix] == EMPTY ){
-            if( i == 0 ){
-                empty_ixs[0] = ix;
-            }
-            else{
-                j = rand() % i;
-                empty_ixs[i] = empty_ixs[j];
-                empty_ixs[j] = ix;
-            }
-            i++;
-        }
-    }
-    //random_shuffle( &empty_ixs[0], 
-    //&empty_ixs[ size ] );
-
-    //try each one to see if legal
-    bool legal_moves_available = false;
-    int candidate, action;
-    for( int j=0; j<size; j++ ){
-        candidate = empty_ixs[j];
-        //action = state->ix2action( candidate, state->player );
-        bool is_legal = applyAction( p_uncast_state, candidate, false );
-        //state = (GoState*) *p_uncast_state;
-
-        if( is_legal ){
-            legal_moves_available = true;
-            //if( to_exclude[candidate] == false ){
-            if( !to_exclude->get(candidate) ){
-                //return action;
-                return candidate;
+        int i = 0;
+        int j;
+        //can shuffle randomly as we insert...
+        for( int ix=0; ix<state->boardsize; ix++ ){
+            if( state->board[ix] == EMPTY ){
+                if( i == 0 ){
+                    empty_ixs[0] = ix;
+                }
+                else{
+                    j = rand() % i;
+                    empty_ixs[i] = empty_ixs[j];
+                    empty_ixs[j] = ix;
+                }
+                i++;
             }
         }
+        //random_shuffle( &empty_ixs[0], 
+        //&empty_ixs[ size ] );
+
+        //try each one to see if legal
+        bool legal_moves_available = false;
+        int candidate, action;
+        for( int j=0; j<size; j++ ){
+            candidate = empty_ixs[j];
+            //action = state->ix2action( candidate, state->player );
+            bool is_legal = applyAction( p_uncast_state, candidate, false );
+            //state = (GoState*) *p_uncast_state;
+            if( is_legal ){
+                legal_moves_available = true;
+                //if( to_exclude[candidate] == false ){
+                if( !to_exclude->get(candidate) ){
+                    //return action;
+                    return candidate;
+                }
+            }
+        }
+
+        if( legal_moves_available ){ //but all were excluded...
+            return excluded_action;
+        }
+        else {
+            return PASS;
+        }
     }
 
-    if( legal_moves_available ){ //but all were excluded...
-        return excluded_action;
-    }
-    else {
-        return PASS;
-    }
-}
-
-bool fullyExpanded( int action ){
-    return action == excluded_action;
-}
-
-    bool isChanceAction( void* state ){
-        return false;
+    bool fullyExpanded( int action ){
+        return action == excluded_action;
     }
 
-    bool isTerminal( void* uncast_state ){
-        GoState* state = (GoState*) uncast_state;
-        GoState* last_state = state->past_states[NUM_PAST_STATES-1];
-        return state->action == PASS && last_state->action == PASS;
-    }
+        bool isChanceAction( void* state ){
+            return false;
+        }
+
+        bool isTerminal( void* uncast_state ){
+            GoState* state = (GoState*) uncast_state;
+            GoState* last_state = state->past_states[NUM_PAST_STATES-1];
+            return state->action == PASS && last_state->action == PASS;
+        }
 
 };
 
