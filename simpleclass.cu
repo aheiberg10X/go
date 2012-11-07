@@ -1,0 +1,1 @@
+../test/simpleclass.cu
