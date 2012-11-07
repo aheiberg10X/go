@@ -47,7 +47,7 @@ const int NUM_PAST_STATES = 10;
 class GoState {
     public :
         /*std::string name;*/
-        int dim;
+        /*int dim;*/
         int bigdim;
         int boardsize;
         /*char* board;*/
@@ -63,12 +63,19 @@ class GoState {
         int num_open;
 
         char player;
+        //TODO 
+        //hard allocate this
         GoState* past_states[NUM_PAST_STATES];
         //TODO: past states
         
         //ctor
-        GoState ( /*std::string, int,*/ bool );
-        ~GoState();
+        GoState ( /*std::string, int,*/ bool shallow);
+        __device__ __host__ GoState( void** pointers );
+        __device__ __host__ ~GoState();
+
+        //cuda specific
+        int numElementsToCopy();
+        void cudaAllocateAndCopy( void** pointers );
         
         GoState* copy(bool shallow);
         void copyInto( GoState* state );
@@ -94,7 +101,7 @@ class GoState {
         void setBoard( int ix, char color );
         void setBoard( int* ixs, int len, char );
 
-        int neighbor(int ix, DIRECTION dir);
+        __device__ __host__ int neighbor(int ix, DIRECTION dir);
         void neighborsOf( int* to_fill,
                            int ix, 
                            int adjacency );
@@ -119,13 +126,8 @@ class GoState {
 
         bool isSuicide( int action );
         
-        //TODO
-        //figure out if these static or member
-        //might not be a good idea to uses these at all
-        //functions call each other and sometimes use the same array
-        //
-        //hard allocate this, boardsize now fixed at compile time
-        int* floodfill_array;
+        /*int* floodfill_array;*/
+        int floodfill_array[BOARDSIZE];
 
         int neighbor_array[8];
         int filtered_array[8];

@@ -13,8 +13,6 @@
 using namespace std;
 
 ///////////////////////////////////////////////////////////////////////////
-//TODO 
-//may get speed up if maintain queue of open_positions
 GoState::GoState( /*string name, int dimension,*/ bool ashallow ){
     //this->name = name;
     //dim = DIM; //dimension;
@@ -38,6 +36,9 @@ GoState::GoState( /*string name, int dimension,*/ bool ashallow ){
 
     //floodfill_array = new int[boardsize];
 
+    //TODO
+    //make past_states simply hold [board1,player1, ... , boardN, playerN]
+    //array.  Statically allocated
     if( ! ashallow ){
         shallow = false;
         for( int i=0; i < NUM_PAST_STATES; i++ ){
@@ -51,16 +52,77 @@ GoState::GoState( /*string name, int dimension,*/ bool ashallow ){
     }
 }
 
+
+int GoState::numElementsToCopy(){
+    //not including past states
+    return 7;
+}
+
+GoState::GoState( void** pointers ){
+    bigdim = *((int*) pointers[0]);
+    boardsize = *((int*) pointers[1]);
+    action = *((int*) pointers[2]);
+    num_open = *((int*) pointers[3]);
+
+    for( int i=0; i<boardsize; i++ ){
+        board[i] = ((char*) pointers[4])[i];
+    }
+
+    player = *((char*) pointers[5]);
+    shallow = *((bool*) pointers[6]);
+}
+
+void GoState::cudaAllocateAndCopy( void** pointers ){
+    int* dev_bigdim;
+    int* dev_boardsize;
+    int* dev_action;
+    int* dev_num_open;
+    char* dev_board;
+    char* dev_player;
+    bool* dev_shallow;
+
+    //cudaMalloc( (void**)&dev_dim, sizeof(int) );
+    cudaMalloc( (void**)&dev_bigdim, sizeof(int) );
+    cudaMemcpy( dev_bigdim, &bigdim, sizeof(int), cudaMemcpyHostToDevice );
+    pointers[0] = (void*) dev_bigdim;
+
+    cudaMalloc( (void**)&dev_boardsize, sizeof(int) );
+    cudaMemcpy( dev_boardsize, &boardsize, sizeof(int), cudaMemcpyHostToDevice );
+    pointers[1] = (void*) dev_boardsize;
+
+    cudaMalloc( (void**)&dev_action, sizeof(int) );
+    cudaMemcpy( dev_action, &action, sizeof(int), cudaMemcpyHostToDevice );
+    pointers[2] = (void*) dev_action;
+
+    cudaMalloc( (void**)&dev_num_open, sizeof(int) );
+    cudaMemcpy( dev_num_open, &num_open, sizeof(int), cudaMemcpyHostToDevice );
+    pointers[3] = (void*) dev_num_open;
+
+    cudaMalloc( (void**)&dev_board, boardsize*sizeof(char) );
+    cudaMemcpy( dev_board, board, boardsize*sizeof(char), cudaMemcpyHostToDevice );
+    pointers[4] = (void*) dev_board;
+
+    cudaMalloc( (void**)&dev_player, sizeof(char) );
+    cudaMemcpy( dev_player, &player, sizeof(char), cudaMemcpyHostToDevice );
+    pointers[5] = (void*) dev_player;
+
+    cudaMalloc( (void**)&dev_shallow, sizeof(bool) );
+    cudaMemcpy( dev_shallow, &shallow, sizeof(bool), cudaMemcpyHostToDevice );
+    pointers[6] = (void*) dev_shallow;
+}
+
 GoState::~GoState(){
     //delete board;
+    //TODO
+    //will not be creating this using new anymore, will have to not delete
     //delete floodfill_array;
     //open_positions.clear();
 
-    if( !shallow ){
-        for( int i=0; i < NUM_PAST_STATES; i++ ){
-            delete past_states[i];
-        }
-    }
+    //if( !shallow ){
+    //for( int i=0; i < NUM_PAST_STATES; i++ ){
+    //delete past_states[i];
+    //}
+    //}
     //TODO why does this cause such havoc?
     //delete past_states;
 }
@@ -108,7 +170,7 @@ bool GoState::sameAs( char* board, char player ){
 }
 
 bool GoState::sameAs( GoState s ){
-    assert( s.dim == dim );
+    assert( s.bigdim == bigdim );
     return sameAs( s.board, s.player );
 }
 
@@ -140,7 +202,7 @@ string GoState::toString(){
     return out;
 }
 
-int GoState::neighbor(int ix, DIRECTION dir){
+__device__ int GoState::neighbor(int ix, DIRECTION dir){
     if( board[ix] == OFFBOARD ){
         return OFFBOARD;
     }
@@ -152,10 +214,12 @@ int GoState::neighbor(int ix, DIRECTION dir){
         else if( dir == NW ){ return ix - bigdim - 1; }
         else if( dir == NE ){ return ix - bigdim + 1; }
         else if( dir == SW ){ return ix + bigdim - 1; }
-        else if( dir == SE ){ return ix + bigdim + 1; }
-        else{
-            assert(false);
+        else {//if( dir == SE ){ 
+            return ix + bigdim + 1; 
         }
+        //else{
+        //assert(false);
+        //}
     }
 }
 
@@ -245,7 +309,7 @@ void GoState::filterByColor( int* to_fill,
                              int filter_len ){
 
     *to_fill_len = 0;
-    int fillix = 0;
+    //int fillix = 0;
     char ncolor;
     for(int naix=0; naix<adjacency; naix++){
         int nix = neighbs[naix];
