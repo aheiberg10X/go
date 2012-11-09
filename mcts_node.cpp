@@ -9,7 +9,9 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     num_players = anum_players;
     num_actions = anum_actions;
     //tried_actions = new bool[anum_actions];
-    tried_actions = new BitMask(anum_actions);
+    //TODO malloc instead
+    tried_actions = new BitMask; //(anum_actions);
+    //tried_actions->initBitMask();
 
     //for( int i=0; i<num_actions; i++ ){
     //tried_actions[i] = false;
@@ -36,7 +38,8 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     num_players = aparent->num_players;
     num_actions = aparent->num_actions;
 
-    tried_actions = new BitMask(num_actions);
+    tried_actions = new BitMask; // (num_actions);
+    //tried_actions->initBitMask();
     //tried_actions = new bool[num_actions];
     //for( int i=0; i<num_actions; i++ ){
     //tried_actions[i] = false;
@@ -51,7 +54,7 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     //
     //TODO: cant call state->action2ix but need to
     //tried_actions[action] = true;
-    parent->tried_actions->set(action,true);
+    parent->tried_actions->set(action, true);
     parent->children[action] = this;
 
 

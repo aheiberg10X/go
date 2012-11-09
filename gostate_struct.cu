@@ -281,12 +281,6 @@ bool GoStateStruct::floodFill(
                 char* stop_color_array,
                 int stop_len ){
 
-    //TODO 
-    //allocate these in struct def?
-    //fuck yes probably, how get around this mem usage is getting huge
-    //per board
-    //will fixed mem alg be fast enough?
-    //For the meantime merge these
     marked.clear(); //initBitMask();
     on_queue.clear(); //initBitMask();
     queue.clear(); //initQueue();
@@ -298,7 +292,9 @@ bool GoStateStruct::floodFill(
 
     while( !queue.isEmpty() ){
         int ix = queue.pop();
+        printf( "ix: %d\n", ix );
         marked.set( ix, true);
+        printf( "marked set %d to 1\n", ix );
  
         neighborsOf(  
                      neighbs, 
@@ -334,8 +330,11 @@ bool GoStateStruct::floodFill(
             assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
                 int ix = filtered_array[faix];
+                //printf("checking marekd and onqueue for %d\n",ix );
                 if( !marked.get( ix) && !on_queue.get( ix) ){
+                    printf("pushing %d onto queue\n", ix );
                     queue.push(ix);
+                    printf("setting %d to 1 in on_queue\n", ix);
                     on_queue.set( ix,true);
                 }
             }

@@ -1,4 +1,4 @@
-#ifndef BITMASK_H
+Rifndef BITMASK_H
 #define BITMASK_H
 
 #include <assert.h>

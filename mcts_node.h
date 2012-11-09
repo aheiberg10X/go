@@ -3,7 +3,7 @@
 
 /*#include <map>*/
 /*#include <set>*/
-#include "bitmask.cpp"
+#include "bitmask.h"
 #include <iostream>
 
 class MCTS_Node {

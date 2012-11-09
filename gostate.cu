@@ -6,7 +6,7 @@
 #include <sstream>
 
 #include "queue.cpp"
-#include "bitmask.cpp"
+#include "bitmask.h"
 //TODO: remove this and see what breaks
 //will need to come out
 

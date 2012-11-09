@@ -1,7 +1,7 @@
 #ifndef DOMAIN_H
 #define DOMAIN_H
 
-#include "bitmask.cpp"
+#include "bitmask.h"
 #include <string>
 /*#include <set>*/
 /*#include "action.h"*/

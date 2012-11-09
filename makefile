@@ -1,30 +1,41 @@
 CFLAGS = #-pg
+INC = -I/usr/local/cuda/include
+LINKS = -L/usr/local/cuda/lib64 -lcuda -lcudart
+CMPLR = nvcc
 
-all: clean go
+all:  clean go
 
-go: go.o gostate.o godomain.o mcts.o
-	g++ go.o gostate.o godomain.o mcts.o mcts_node.o -o go ${CFLAGS}
+#newgo: newgo.o bitmask.o
+
+newgo.o:
+	g++ -c newgo.cpp
+
+go: go.o gostate_struct.o godomain.o mcts.o 
+	${CMPLR} -o go ${LINKS} *.o 
 
 mcts.o : mcts_node.o
-	g++ -c mcts.cpp ${CFLAGS}
+	${CMPLR} -c mcts.cpp ${CFLAGS}
 
 mcts_node.o: 
-	g++ -c mcts_node.cpp ${CFLAGS}
+	${CMPLR} -c mcts_node.cpp ${CFLAGS}
 
 godomain.o: 
-	g++ -c godomain.cpp ${CFLAGS}
+	${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
 
 #stonestring.o:
 	#g++ -c stonestring.cpp ${CFLAGS}
 
 go.o:
-	g++ -c go.cpp ${CFLAGS}  
+	${CMPLR} -c go.cpp ${INC} ${CFLAGS}  
 
-gostate.o: queue.o 
-	g++ -c gostate.cpp ${CFLAGS}
+gostate_struct.o: queue.o bitmask.o
+	nvcc -c gostate_struct.cu ${CFLAGS} 
 
 queue.o:
-	g++ -c queue.cpp ${CFLAGS}
+	nvcc -c queue.cu ${CFLAGS}
+
+bitmask.o:
+	nvcc -c bitmask.cu ${CFLAGS}
 
 clean:
 	rm -rf *.o go 

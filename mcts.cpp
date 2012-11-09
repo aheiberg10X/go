@@ -3,7 +3,8 @@
 #include <iostream>
 
 //for debugging
-#include "gostate.h"
+//#include "gostate.h"
+#include "gostate_struct.h"
 
 using namespace std;
 
@@ -25,16 +26,16 @@ int MCTS::search( void* root_state ){
     int iterations = 0;
     while( iterations < 1000 ){
         state = domain->copyState(root_state);
-        //cout << endl << endl << "iteration: " << iterations << endl;
-        //cout << "\n\nroot state: " << ((GoState*) state)->toString() << endl;
+        cout << endl << endl << "iteration: " << iterations << endl;
+        cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
         node = treePolicy( root_node, (void**) &state );
 
-        //cout << "state after tree policy: " << ((GoState*) state)->toString() << endl;
+        cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
         defaultPolicy( rewards, (void**) &state );
-        //cout << "state after simulation: " << ((GoState*) state)->toString() << endl;
+        cout << "state after simulation: " << ((GoStateStruct*) state)->toString() << endl;
 
-        //cout << "rewards: " << rewards[0] << "," << rewards[1] << endl;
+        cout << "rewards: " << rewards[0] << "," << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
         iterations += 1; 
@@ -83,7 +84,8 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     //for(int i=0; i<node->num_actions; i++ ){
     //empty_to_exclude[i] = false;
     //}
-    BitMask empty_to_exclude (node->num_actions);
+    BitMask empty_to_exclude;// (node->num_actions);
+    //empty_to_exclude.initBitMask();
 
     while( node->marked && !domain->isTerminal( *p_uncast_state ) ){
         action = domain->randomAction( p_uncast_state, 
@@ -172,23 +174,24 @@ void MCTS::defaultPolicy( int* rewards,
     int count = 0;
     int action;
 
-    GoState* s = ((GoState*) *p_uncast_state);
-    BitMask to_exclude( s->boardsize );
-    //bool to_exclude[s->boardsize];
-    //for( int i=0; i<s->boardsize; i++ ){
-    //to_exclude[i] = false;
-    //}
+    //GoState* s = ((GoState*) *p_uncast_state);
+    //BitMask to_exclude( s->boardsize );
+    BitMask to_exclude;
+    //to_exclude.initBitMask();
+
     while( !domain->isTerminal( *p_uncast_state) ){
         if( count > 1000 ){
             cout << "probably in loop" << endl;
             break;
         }
+        cout << "getting random" << endl;
         action = domain->randomAction( p_uncast_state, &to_exclude );
 
-        //GoState* state = (GoState*) *p_uncast_state;
-        //cout << "applying: " << action << " to:" << state->toString() << endl;
+        GoStateStruct* state = (GoStateStruct*) *p_uncast_state;
+        cout << "applying: " << action << " to:" << state->toString() << endl;
 
         domain->applyAction( p_uncast_state, action, true );
+        cout << "applied" << endl;
         count++;
     }
     
