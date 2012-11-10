@@ -1,14 +1,13 @@
 CFLAGS = #-pg
-INC = -I/usr/local/cuda/include
-LINKS = -L/usr/local/cuda/lib64 -lcuda -lcudart
-CMPLR = nvcc
+INC = #-I/usr/local/cuda/include
+LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
+CMPLR = nvcc 
 
 all:  clean go
+#all: cleango goonly
 
-#newgo: newgo.o bitmask.o
-
-newgo.o:
-	g++ -c newgo.cpp
+goonly: go.o
+	${CMPLR} -o go ${LINKS} *.o 
 
 go: go.o gostate_struct.o godomain.o mcts.o 
 	${CMPLR} -o go ${LINKS} *.o 
@@ -29,13 +28,16 @@ go.o:
 	${CMPLR} -c go.cpp ${INC} ${CFLAGS}  
 
 gostate_struct.o: queue.o bitmask.o
-	nvcc -c gostate_struct.cu ${CFLAGS} 
+	${CMPLR} -c gostate_struct.cu ${CFLAGS} 
 
 queue.o:
-	nvcc -c queue.cu ${CFLAGS}
+	${CMPLR} -c queue.cu ${CFLAGS}
 
 bitmask.o:
-	nvcc -c bitmask.cu ${CFLAGS}
+	${CMPLR} -c bitmask.cu ${CFLAGS}
+
+cleango:
+	rm -f go.o go
 
 clean:
 	rm -rf *.o go 

@@ -2,45 +2,37 @@
 #include "stdio.h"
 
 GoStateStruct::GoStateStruct( ){
+    player = BLACK;
     action = 42;
     num_open = 0;
+    frozen_num_open = 0;
     for( int i=0; i<BOARDSIZE; i++ ){
         if( i < BIGDIM || 
             i % BIGDIM == 0 || 
             i % BIGDIM == BIGDIM-1 || 
             i >= BOARDSIZE - BIGDIM ) {
                 board[i] = OFFBOARD;
+                frozen_board[i] = OFFBOARD;
         }
         else{
             board[i] = EMPTY; 
+            frozen_board[i] = EMPTY;
             num_open++;
         }
     }
-    player = BLACK;
-}
+    for( int i=0; i<PAST_STATE_SIZE; i++ ){
+        past_boards[i] = OFFBOARD;
+    }
+    for( int i=0; i<NUM_PAST_STATES; i++ ){
+        past_actions[i] = -1;
+        past_players[i] = OFFBOARD;
+    }
 
-void GoStateStruct::initGSS( ){
-    action = 42;
-    num_open = 0;
-    for( int i=0; i<BOARDSIZE; i++ ){
-        if( i < BIGDIM || 
-            i % BIGDIM == 0 || 
-            i % BIGDIM == BIGDIM-1 || 
-            i >= BOARDSIZE - BIGDIM ) {
-                board[i] = OFFBOARD;
-        }
-        else{
-            board[i] = EMPTY; 
-            num_open++;
-        }
-    }
-    player = BLACK;
 }
 
 int GoStateStruct::numElementsToCopy(){
     return 7;
 }
-
 /*
 void GoStateStruct::cudaAllocateAndCopy( void** pointers ){
     int* dev_action;
@@ -80,10 +72,26 @@ void GoStateStruct::cudaAllocateAndCopy( void** pointers ){
     pointers[6] = (void*) dev_past_actions;
 }*/
 
+void GoStateStruct::freezeBoard(){
+    for( int i=0; i<BOARDSIZE; i++ ){
+        frozen_board[i] = board[i];
+    }
+    frozen_num_open = num_open;
+}
+
+void GoStateStruct::thawBoard(){
+    for( int i=0; i<BOARDSIZE; i++ ){
+        //setBoard(i, frozen_board[i]);
+        board[i] = frozen_board[i];
+    }
+    num_open = frozen_num_open;
+}
+
 void* GoStateStruct::copy(){
     GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
     for( int i=0; i<BOARDSIZE; i++ ){
         s->board[i] = board[i];
+        s->frozen_board[i] = frozen_board[i];
     }
 
     s->num_open = num_open;
@@ -93,10 +101,10 @@ void* GoStateStruct::copy(){
     for( int i=0; i<PAST_STATE_SIZE; i++){
         s->past_boards[i] = past_boards[i];
     }
-    s->past_players[0] = past_players[0];
-    s->past_players[1] = past_players[1];
-    s->past_actions[0] = past_actions[0];
-    s->past_actions[1] = past_actions[1];
+    for( int i=0; i<NUM_PAST_STATES; i++ ){
+        s->past_players[i] = past_players[i];
+        s->past_actions[i] = past_actions[i];
+    }
     return (void*) s; 
 };
 
@@ -134,7 +142,9 @@ string GoStateStruct::boardToString( char* board ){
         else if( board[i] == WHITE    ){ out += "o"; }
         else if( board[i] == OFFBOARD ){ out += "_"; }
         else if( board[i] == EMPTY    ){ out += "."; }
-        else{                                 assert(false); }
+        else{   
+            printf( "offending pos is %d, %c\n", i, board[i] );
+            assert(false); }
 
         out += " ";
         if( i % BIGDIM == BIGDIM-1 ){
@@ -239,7 +249,6 @@ void GoStateStruct::setBoard( int* ixs, int len, char color ){
     }
 }    
 
-
 void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
     //assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
@@ -292,9 +301,7 @@ bool GoStateStruct::floodFill(
 
     while( !queue.isEmpty() ){
         int ix = queue.pop();
-        printf( "ix: %d\n", ix );
         marked.set( ix, true);
-        printf( "marked set %d to 1\n", ix );
  
         neighborsOf(  
                      neighbs, 
@@ -330,11 +337,8 @@ bool GoStateStruct::floodFill(
             assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
                 int ix = filtered_array[faix];
-                //printf("checking marekd and onqueue for %d\n",ix );
                 if( !marked.get( ix) && !on_queue.get( ix) ){
-                    printf("pushing %d onto queue\n", ix );
                     queue.push(ix);
-                    printf("setting %d to 1 in on_queue\n", ix);
                     on_queue.set( ix,true);
                 }
             }
@@ -423,27 +427,33 @@ bool GoStateStruct::isDuplicatedByPastState(){
         int offset = i*BOARDSIZE;
         //int end = begin+BOARDSIZE-1;
         if( sameAs( &past_boards[offset], past_players[i] ) ){
-            printf( "same as: %d", i );
             return true;
         }
     }
     return false;
 }
 
-void GoStateStruct::advancePastStates( GoStateStruct* newest_past_state ){
+//void GoStateStruct::advancePastStates( GoStateStruct* newest_past_state ){
+void GoStateStruct::advancePastStates( char* past_board, 
+                                       char past_player,
+                                       int past_action ){
     //memcpy?
     int c = PAST_STATE_SIZE-BOARDSIZE;
+    //shift last i-1 boards over one
     for( int i=0; i<c; i++ ){
         past_boards[i] = past_boards[i+BOARDSIZE];
     }
+    //fill in vacant end spots with the latest board (past_board)
     for( int i=c; i<PAST_STATE_SIZE; i++ ){
-        past_boards[i] = newest_past_state->board[i-c];
+        //printf("%d : %c\n", i-c, past_board[i-c]);
+        past_boards[i] = past_board[i-c];
     }
+
     for( int i=0; i<NUM_PAST_STATES-1; i++ ){
         past_players[i] = past_players[i+1];
         past_actions[i] = past_actions[i+1];
     }
-    past_players[NUM_PAST_STATES-1] = newest_past_state->player;
-    past_actions[NUM_PAST_STATES-1] = newest_past_state->action;
+    past_players[NUM_PAST_STATES-1] = past_player;
+    past_actions[NUM_PAST_STATES-1] = past_action;
     
 }

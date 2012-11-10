@@ -16,6 +16,7 @@ int main(){
     cout << sizeof(char) << endl;
     cout << sizeof(bool) << endl;
     cout << sizeof(GoStateStruct) << endl;
+    cout << PAST_STATE_SIZE << endl;
 
     srand(time(NULL));
 
@@ -49,21 +50,20 @@ int main(){
     }
 
 
-    if( true ){
+    if( false ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;
-        gs->initGSS();
-        void** p_uncast_state = (void**) &gs;
+        void* uncast_state = (void*) gs;
         MCTS mcts(domain);
 
         cout << "yeesh" << endl;
 
-        while( !domain->isTerminal( *p_uncast_state ) ){
-            int best_action = mcts.search( *p_uncast_state );
+        while( !domain->isTerminal( uncast_state ) ){
+            int best_action = mcts.search( uncast_state );
             cout << "Best Action: " << best_action << endl;
-            domain->applyAction( p_uncast_state, best_action, true );
+            domain->applyAction( uncast_state, best_action, true );
             cout << "Applying action: " << best_action << endl;
-            cout << "Resulting state: " << ((GoStateStruct* ) *p_uncast_state)->toString(  ) << endl;
+            cout << "Resulting state: " << ((GoStateStruct* ) uncast_state)->toString(  ) << endl;
             cout << "hit any key..." << endl;
 
             cin.ignore();
@@ -74,13 +74,11 @@ int main(){
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
     //work in fixed memory
-    if( false ){
+    if( true ){
 
         //string name = "original";
         //GoState* state = new GoState( false );
         GoStateStruct* state = new GoStateStruct();
-        //state->initGSS( );
-        void** p_uncast_state = (void**) &state;
 
         const int l = 6;
         int is[l] = {2,2,3,3,4,4};
@@ -97,14 +95,26 @@ int main(){
         int is2[ll] = {2,2,3,3,4,4};
         int js2[ll] = {1,3,2,3,1,2};
         for( int i=0; i<ll; i++ ){
-            state2->setBoard( state2->coord2ix( is2[i], js2[i] ), WHITE );
+            state2->setBoard( state2->coord2ix( is2[i], js2[i] ), BLACK );
         }
-        state->advancePastStates( state2 );
 
-        cout << state->boardToString( &(state->past_boards[BOARDSIZE]) ) << endl;
+        //cout << state->boardToString( state2->board ) << endl;
+        state->advancePastStates( state2->board,
+                                  state2->player,
+                                  state2->action );
+
+        //cout << state->boardToString( &(state->past_boards[PAST_STATE_SIZE-BOARDSIZE]) ) << endl;
 
         cout << "duplicated: " << state->isDuplicatedByPastState() << endl;
-
+        GoDomain gd;
+        BitMask bm;
+        while( !gd.isTerminal( (void*) state ) ){
+            cout << state->toString() << endl;
+            int action = gd.randomAction( (void*) state, &bm );
+            bool legal = gd.applyAction( (void*) state, action, true );
+        }
+        cout << state->toString() << endl;
+         
 /*
         GoDomain gd;
 

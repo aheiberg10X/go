@@ -29,13 +29,13 @@ int MCTS::search( void* root_state ){
         cout << endl << endl << "iteration: " << iterations << endl;
         cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
-        node = treePolicy( root_node, (void**) &state );
+        node = treePolicy( root_node, state );
 
         cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
-        defaultPolicy( rewards, (void**) &state );
+        defaultPolicy( rewards, state );
         cout << "state after simulation: " << ((GoStateStruct*) state)->toString() << endl;
 
-        cout << "rewards: " << rewards[0] << "," << rewards[1] << endl;
+        //cout << "rewards: " << rewards[0] << "," << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
         iterations += 1; 
@@ -72,12 +72,12 @@ int MCTS::search( void* root_state ){
 }
 
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
-                             void**     state ){
+                             void*     state ){
     return randomPolicy( node, state );
 }
 
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
-                               void**     p_uncast_state ){
+                               void*     uncast_state ){
     int action;
     MCTS_Node* node = root_node;
     //bool empty_to_exclude[node->num_actions];
@@ -87,14 +87,14 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     BitMask empty_to_exclude;// (node->num_actions);
     //empty_to_exclude.initBitMask();
 
-    while( node->marked && !domain->isTerminal( *p_uncast_state ) ){
-        action = domain->randomAction( p_uncast_state, 
+    while( node->marked && !domain->isTerminal( uncast_state ) ){
+        action = domain->randomAction( uncast_state, 
                                        &empty_to_exclude );
         //if( !domain->isChanceAction ){
         //}
         //else{
         //}
-        domain->applyAction( p_uncast_state, 
+        domain->applyAction( uncast_state, 
                              action, 
                              true );
 
@@ -114,7 +114,7 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
 }
 
 MCTS_Node* MCTS::uctPolicy( MCTS_Node* node, 
-                            void**     state ){
+                            void*    state ){
     return node;
 }
 
@@ -168,7 +168,7 @@ MCTS_Node* MCTS::bestChild( MCTS_Node* parent,
 
 
 void MCTS::defaultPolicy( int* rewards, 
-                          void** p_uncast_state ){
+                          void* uncast_state ){
     
     //cout << "inside defaultPolicy" << endl;
     int count = 0;
@@ -179,23 +179,24 @@ void MCTS::defaultPolicy( int* rewards,
     BitMask to_exclude;
     //to_exclude.initBitMask();
 
-    while( !domain->isTerminal( *p_uncast_state) ){
+    while( !domain->isTerminal( uncast_state) ){
         if( count > 1000 ){
             cout << "probably in loop" << endl;
             break;
         }
-        cout << "getting random" << endl;
-        action = domain->randomAction( p_uncast_state, &to_exclude );
-
-        GoStateStruct* state = (GoStateStruct*) *p_uncast_state;
-        cout << "applying: " << action << " to:" << state->toString() << endl;
-
-        domain->applyAction( p_uncast_state, action, true );
+        action = domain->randomAction( uncast_state, &to_exclude );
+        cout << "actionasdf: " << action << endl;
+        //GoStateStruct* state = (GoStateStruct*) uncast_state;
+        
+        domain->applyAction( uncast_state, action, true );
         cout << "applied" << endl;
         count++;
     }
-    
-    domain->getRewards( rewards, *p_uncast_state );
+   
+    cout <<"wtfhehehehe" << endl; 
+    cout << "one" << endl;
+    domain->getRewards( rewards, uncast_state );
+    cout << "two" << endl;
 
 }
 

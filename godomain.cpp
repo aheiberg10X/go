@@ -51,22 +51,26 @@ public :
     };
 
     void deleteState( void* state ) {
-        GoStateStruct* gs = (GoStateStruct*) state;
-        delete gs;
-        return;
+        cout << "commented out deleteState" << endl;
+        //GoStateStruct* gs = (GoStateStruct*) state;
+        //delete gs;
+        //return;
     }
 
-    bool applyAction( void** p_uncast_state, 
+    bool applyAction( void* uncast_state, 
+            //GoStateStruct* state, 
                       int action,
                       bool side_effects ){
 
+        cout << "inside applyAction" << endl;
         assert( action >= 0 );
-        GoStateStruct* state = (GoStateStruct*) *p_uncast_state;
+        GoStateStruct* state = (GoStateStruct*) uncast_state;
         //cout << state->toString() << endl;
         //cout << "ix: " << action << " state->player: " << state->player << endl;
 
         bool legal = true;
-        GoStateStruct* frozen = (GoStateStruct*) state->copy();
+        state->freezeBoard();
+        //GoStateStruct* frozen = (GoStateStruct*) state->copy();
         //cout << "froxqne toString: " << frozen->toString() << endl;
 
         //The action parameter is really the index of the action to be taken
@@ -74,13 +78,11 @@ public :
         int ix = action;
         char color = state->player;
         action = state->ix2action( action, color);
-        cout << "here D" << endl;
 
         if( ! state->isPass(action) ){
             //assert( state->action2color(action) == state->player );
             //char color = state->action2color(action);
             state->setBoard( ix, color );
-            cout << "here C" << endl;
             //resolve captures
             int adjacency = 4;
             int neighbs[adjacency];
@@ -94,19 +96,16 @@ public :
                            neighbs, adjacency,
                            filter_array, 1 );
 
-            cout << "here B" << endl;
             int num_removed = 0;
             for( int onix=0; onix < opp_len; onix++ ){
                 int floodfill_len = 0;
                 char stop_color_array[1] = {EMPTY};
-                cout << "ffing" << endl;
                 bool fill_completed =
                 state->floodFill( state->floodfill_array, &floodfill_len,
                                   opp_neighbs[onix],
                                   adjacency,
                                   filter_array, 1,
                                   stop_color_array, 1 );
-                cout << "ffing done" << endl;
                 if( fill_completed ){
                     state->setBoard(
                               state->floodfill_array,
@@ -114,17 +113,14 @@ public :
                               EMPTY );
                 }
             }
-            cout << "here A" << endl;
             if( state->isSuicide( action ) ){
                 legal = false;
             }
-            cout << "after suicide" << endl;
 
             //TODO
             //change this for new abstraction
             //check past states for duplicates
             legal &= !state->isDuplicatedByPastState();
-            cout <<"after dup check" << endl;
             /*
             for( int i=0; i < NUM_PAST_STATES; i++ ){
                 GoStateStruct* past_state = state->past_states[i];
@@ -136,16 +132,15 @@ public :
             }*/
         }
         
-
-        cout << "here" << endl;
+        cout << "testing legality" << endl;
         if( legal ){
             if( side_effects ){
-                cout << "applying legal action" << endl;
+                cout << "legal and side effects" <<endl;
+                state->advancePastStates( state->frozen_board, 
+                                          state->player,
+                                          state->action );
+
                 state->action = action;
-                //TODO
-                //rework for new abstraction 
-                state->advancePastStates( frozen );
-                cout << "stuck in advance" << endl;
                 /*
                 delete state->past_states[0];
                 for( int i=0; i<NUM_PAST_STATES-1; i++ ){
@@ -157,14 +152,11 @@ public :
                 state->togglePlayer();
             }
             else{
-                //TODO why does this cause segfault?
-                //p_uncast_state = ((void**) &frozen);
-                *p_uncast_state = (void*) frozen;
-                //cout << "frozen player: " << frozen->player << endl;
-                //cout << "\nstate: " << state << endl;
-                //cout << "deref p_uncast: " << *p_uncast_state << endl;
-                delete state;
-
+                cout << "legal, no se" << endl;
+                //*p_uncast_state = (void*) frozen;
+                //delete state;
+                state->thawBoard();
+                cout << "thaw not probl" << endl;
             }
             return true;
         }
@@ -174,12 +166,10 @@ public :
                 assert(false);
             }
             else{
-                //p_uncast_state = ((void**) &frozen);
-                //
-                delete state;
-                *p_uncast_state = (void*) frozen;
-                //cout << "frozen player: " << frozen->player << endl;
-                //cout << "frozen player2: " << frozen->player << endl;
+                cout << "not legal, no se" << endl;
+                //delete state;
+                //*p_uncast_state = (void*) frozen;
+                state->thawBoard();
             }
             return false;
         }  
@@ -189,9 +179,8 @@ public :
     
     void getRewards( int* to_fill,
                      void* uncast_state ){
-
+        cout << "start getRewards" << endl;
         GoStateStruct* state = (GoStateStruct*) uncast_state;
-        cout << "in getRewards" << endl;
 
         //set<int> marked;
         BitMask marked; //( state->boardsize );
@@ -250,7 +239,6 @@ public :
             if( state->board[ix] == OFFBOARD ||
                 marked.get( ix ) ){
                     //marked.find(ix) != marked.end() ){
-                    //cout << "here2" << endl;
                 continue;
             }
             if( state->board[ix] == WHITE ){
@@ -261,7 +249,6 @@ public :
                 black_score++;
                 continue;
             }
-            //cout << "asdfasdf" << endl;
 
             //find if ix has a neighbors of {WHITE,EMPTY} or {BLACK,EMPTY}
             //if so, set ncolor to be WHITE or BLACK
@@ -324,9 +311,7 @@ public :
                 //mark these empty positions regardless of their territory 
                 //status
                 for( int i=0; i<floodfill_len; i++ ){
-                    //cout << "here3" <<endl;
                     marked.set( state->floodfill_array[i], true );
-                    //cout << "here4"  <<endl;
                     //marked.insert( state->floodfill_array[i] );
                     if( are_territories ){
                         if( ncolor == WHITE ){
@@ -346,32 +331,27 @@ public :
 
         to_fill[0] = white_score > black_score ? 1 : 0;
         to_fill[1] = black_score > white_score ? 1 : 0;
-        cout << "returning on getRewards" << endl;
+        cout << "end getRewards" << endl;
         return;
     }
 
     //return an unsigned action, i.e an ix in the board
-    int randomAction( void** p_uncast_state,
+    int randomAction( void* uncast_state,
                       BitMask* to_exclude ){
         //bool* to_exclude ){
-
-        GoStateStruct* state = (GoStateStruct*) *p_uncast_state;
+        cout << "inside randomAction" << endl;
+        GoStateStruct* state = (GoStateStruct*) uncast_state;
         //get a random shuffle of the empty intersections
         //set<int>::iterator it;
         int size = state->num_open; //state->open_positions.size();
         int empty_ixs[ size ];
         cout << "size: " << size << endl;
 
-        //for( it = state->open_positions.begin();
-        //it != state->open_positions.end();
-        //it++ ){
-        //empty_ixs[i++] = *it;
-        //}
-
         int i = 0;
         int j;
         //can shuffle randomly as we insert...
         for( int ix=0; ix<BOARDSIZE; ix++ ){
+            //cout << "random shuffle i: " << i << endl;
             if( state->board[ix] == EMPTY ){
                 if( i == 0 ){
                     empty_ixs[0] = ix;
@@ -384,20 +364,18 @@ public :
                 i++;
             }
         }
-        cout << "randomly shuffled" << endl;
-        //random_shuffle( &empty_ixs[0], 
-        //&empty_ixs[ size ] );
+        cout << "after shuffled" << endl;
 
         //try each one to see if legal
         bool legal_moves_available = false;
         int candidate, action;
         for( int j=0; j<size; j++ ){
             candidate = empty_ixs[j];
-            //action = state->ix2action( candidate, state->player );
-            cout << "calling applyAction" << endl;
-            bool is_legal = applyAction( p_uncast_state, candidate, false );
-            cout << "applyAction returned" << endl;
-            //state = (GoStateStruct*) *p_uncast_state;
+            cout << "legality test begin" << endl;
+            bool is_legal = applyAction( uncast_state, candidate, false );
+            cout << "legaity test conclude" << endl;
+            //bool is_legal = applyAction( state, candidate, false );
+
             if( is_legal ){
                 legal_moves_available = true;
                 //if( to_exclude[candidate] == false ){
@@ -408,7 +386,6 @@ public :
             }
         }
 
-        cout << "down here" <<endl;
         if( legal_moves_available ){ //but all were excluded...
             return excluded_action;
         }
@@ -421,18 +398,21 @@ public :
         return action == excluded_action;
     }
 
-        bool isChanceAction( void* state ){
-            return false;
-        }
+    bool isChanceAction( void* state ){
+        return false;
+    }
 
-        bool isTerminal( void* uncast_state ){
-            GoStateStruct* state = (GoStateStruct*) uncast_state;
-            //TODO
-            //rework for new abstraction
-            //GoStateStruct* last_state = state->past_states[NUM_PAST_STATES-1];
-            return state->action == PASS && 
-                   state->past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
-        }
+    bool isTerminal( void* uncast_state ){
+        cout << "whoa there" << endl;
+        GoStateStruct* state = (GoStateStruct*) uncast_state;
+        //TODO
+        //rework for new abstraction
+        //GoStateStruct* last_state = state->past_states[NUM_PAST_STATES-1];
+        bool r = state->action == PASS && 
+               state->past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
+        cout << "wtf" << endl;
+        return r;
+    }
 
 };
 

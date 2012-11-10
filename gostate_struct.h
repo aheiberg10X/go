@@ -17,17 +17,22 @@ using namespace std;
 
 struct GoStateStruct{
     char board[BOARDSIZE];
+    //storage space for current board when checking move legality
+    char frozen_board[BOARDSIZE];
+    int frozen_num_open;
     int action;
     int num_open;
     char player;
 
     char past_boards[PAST_STATE_SIZE]; 
-    char past_players[2];
-    int past_actions[2];
+    char past_players[NUM_PAST_STATES];
+    int past_actions[NUM_PAST_STATES];
 
     //scratch space for floodFill
     //TODO
     //save space by treating this as char array. Numbers [0,121] < 2^8
+    //alternatively, save it as a BitMask, and iterate through each time to 
+    //get the marked elements
     int floodfill_array[BOARDSIZE];
     int neighbor_array[8];
     int filtered_array[8];
@@ -43,8 +48,10 @@ struct GoStateStruct{
 
     int numElementsToCopy();
 
-    /*void cudaAllocateAndCopy( void** pointers );*/
+    void cudaAllocateAndCopy( void** pointers );
 
+    void freezeBoard();
+    void thawBoard();
     void* copy( );
 
     char flipColor( char c );
@@ -104,8 +111,13 @@ struct GoStateStruct{
 
     bool isSuicide( int action );
 
+    void freezeBoard( char* target );
+    void setBoard( char* target );
+
     bool isDuplicatedByPastState();
-    void advancePastStates( GoStateStruct* newest_past_state );
+    void advancePastStates( char* past_board,
+                            char past_player,
+                            int past_action );
 
 };
 
