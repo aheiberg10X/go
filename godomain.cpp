@@ -18,7 +18,6 @@
 
 using namespace std;
 
-static int excluded_action = -123;
 
 class GoDomain : public Domain {
 public :
@@ -34,14 +33,12 @@ public :
 
     int getPlayerIx( void* state ){
         char player = ((GoStateStruct*) state)->player;
+        assert( player == WHITE || player == BLACK );
         if( player == WHITE ){
             return 0;
         }
-        else if( player == BLACK ){
+        else {//if( player == BLACK ){
             return 1;
-        }
-        else{
-            assert(false);
         }
     }
 
@@ -58,134 +55,24 @@ public :
     }
 
     bool applyAction( void* uncast_state, 
-            //GoStateStruct* state, 
                       int action,
                       bool side_effects ){
 
-        cout << "inside applyAction" << endl;
+        //cout << "inside applyAction" << endl;
         assert( action >= 0 );
         GoStateStruct* state = (GoStateStruct*) uncast_state;
-        //cout << state->toString() << endl;
-        //cout << "ix: " << action << " state->player: " << state->player << endl;
-
-        bool legal = true;
-        state->freezeBoard();
-        //GoStateStruct* frozen = (GoStateStruct*) state->copy();
-        //cout << "froxqne toString: " << frozen->toString() << endl;
-
-        //The action parameter is really the index of the action to be taken
-        //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
-        int ix = action;
-        char color = state->player;
-        action = state->ix2action( action, color);
-
-        if( ! state->isPass(action) ){
-            //assert( state->action2color(action) == state->player );
-            //char color = state->action2color(action);
-            state->setBoard( ix, color );
-            //resolve captures
-            int adjacency = 4;
-            int neighbs[adjacency];
-            state->neighborsOf( neighbs, ix, adjacency );
-            char opp_color = state->flipColor(color); 
-
-            int opp_neighbs[adjacency];
-            int opp_len = 0;
-            char filter_array[1] = {opp_color};
-            state->filterByColor( opp_neighbs, &opp_len,
-                           neighbs, adjacency,
-                           filter_array, 1 );
-
-            int num_removed = 0;
-            for( int onix=0; onix < opp_len; onix++ ){
-                int floodfill_len = 0;
-                char stop_color_array[1] = {EMPTY};
-                bool fill_completed =
-                state->floodFill( state->floodfill_array, &floodfill_len,
-                                  opp_neighbs[onix],
-                                  adjacency,
-                                  filter_array, 1,
-                                  stop_color_array, 1 );
-                if( fill_completed ){
-                    state->setBoard(
-                              state->floodfill_array,
-                              floodfill_len, 
-                              EMPTY );
-                }
-            }
-            if( state->isSuicide( action ) ){
-                legal = false;
-            }
-
-            //TODO
-            //change this for new abstraction
-            //check past states for duplicates
-            legal &= !state->isDuplicatedByPastState();
-            /*
-            for( int i=0; i < NUM_PAST_STATES; i++ ){
-                GoStateStruct* past_state = state->past_states[i];
-                if( state->sameAs( past_state->board,
-                            state->flipColor( past_state->player ) ) ){
-                    legal = false;
-                    break;
-                }
-            }*/
-        }
-        
-        cout << "testing legality" << endl;
-        if( legal ){
-            if( side_effects ){
-                cout << "legal and side effects" <<endl;
-                state->advancePastStates( state->frozen_board, 
-                                          state->player,
-                                          state->action );
-
-                state->action = action;
-                /*
-                delete state->past_states[0];
-                for( int i=0; i<NUM_PAST_STATES-1; i++ ){
-                    //TODO del the state we are jettisoning?
-                    state->past_states[i] = state->past_states[i+1];
-                }
-                state->past_states[NUM_PAST_STATES-1] = frozen;
-                */
-                state->togglePlayer();
-            }
-            else{
-                cout << "legal, no se" << endl;
-                //*p_uncast_state = (void*) frozen;
-                //delete state;
-                state->thawBoard();
-                cout << "thaw not probl" << endl;
-            }
-            return true;
-        }
-        else{
-            if( side_effects ){
-                //cout << "action: " << action << endl;
-                assert(false);
-            }
-            else{
-                cout << "not legal, no se" << endl;
-                //delete state;
-                //*p_uncast_state = (void*) frozen;
-                state->thawBoard();
-            }
-            return false;
-        }  
-        //state->setBoard( state->action2ix(action), EMPTY );
-        //return false;
+        return state->applyAction( action, side_effects );
     }
     
     void getRewards( int* to_fill,
                      void* uncast_state ){
-        cout << "start getRewards" << endl;
+        //cout << "start getRewards" << endl;
         GoStateStruct* state = (GoStateStruct*) uncast_state;
 
         //set<int> marked;
         BitMask marked; //( state->boardsize );
         //cout << "ere1" << endl;
-        int string_id = 0;
+        //int string_id = 0;
         //ix : stonestring_id
         //map<int,int> string_lookup;
         // stonestring_id : StoneString()
@@ -331,21 +218,22 @@ public :
 
         to_fill[0] = white_score > black_score ? 1 : 0;
         to_fill[1] = black_score > white_score ? 1 : 0;
-        cout << "end getRewards" << endl;
+        //cout << "end getRewards" << endl;
         return;
     }
 
     //return an unsigned action, i.e an ix in the board
+    /*
     int randomAction( void* uncast_state,
                       BitMask* to_exclude ){
         //bool* to_exclude ){
-        cout << "inside randomAction" << endl;
+        //cout << "inside randomAction" << endl;
         GoStateStruct* state = (GoStateStruct*) uncast_state;
         //get a random shuffle of the empty intersections
         //set<int>::iterator it;
         int size = state->num_open; //state->open_positions.size();
-        int empty_ixs[ size ];
-        cout << "size: " << size << endl;
+        int empty_ixs[ BOARDSIZE ];
+        //cout << "size: " << size << endl;
 
         int i = 0;
         int j;
@@ -357,6 +245,8 @@ public :
                     empty_ixs[0] = ix;
                 }
                 else{
+                    //TODO
+                    //replace with device rand
                     j = rand() % i;
                     empty_ixs[i] = empty_ixs[j];
                     empty_ixs[j] = ix;
@@ -364,16 +254,16 @@ public :
                 i++;
             }
         }
-        cout << "after shuffled" << endl;
+        //cout << "after shuffled" << endl;
 
         //try each one to see if legal
         bool legal_moves_available = false;
-        int candidate, action;
+        int candidate;
         for( int j=0; j<size; j++ ){
             candidate = empty_ixs[j];
-            cout << "legality test begin" << endl;
+            //cout << "legality test begin" << endl;
             bool is_legal = applyAction( uncast_state, candidate, false );
-            cout << "legaity test conclude" << endl;
+            //cout << "legaity test conclude" << endl;
             //bool is_legal = applyAction( state, candidate, false );
 
             if( is_legal ){
@@ -387,15 +277,15 @@ public :
         }
 
         if( legal_moves_available ){ //but all were excluded...
-            return excluded_action;
+            return EXCLUDED_ACTION;
         }
         else {
             return PASS;
         }
-    }
+    }*/
 
     bool fullyExpanded( int action ){
-        return action == excluded_action;
+        return action == EXCLUDED_ACTION;
     }
 
     bool isChanceAction( void* state ){
@@ -403,14 +293,14 @@ public :
     }
 
     bool isTerminal( void* uncast_state ){
-        cout << "whoa there" << endl;
+        //cout << "whoa there" << endl;
         GoStateStruct* state = (GoStateStruct*) uncast_state;
         //TODO
         //rework for new abstraction
         //GoStateStruct* last_state = state->past_states[NUM_PAST_STATES-1];
         bool r = state->action == PASS && 
                state->past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
-        cout << "wtf" << endl;
+        //cout << "wtf" << endl;
         return r;
     }
 

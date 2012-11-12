@@ -19,6 +19,7 @@ class Domain {
         virtual void* copyState( void* state ) = 0;
         virtual void deleteState( void* state ) = 0;
 
+        /*__device__ __host__*/
         virtual bool applyAction( void* state, 
                                   int action,
                                   bool side_effects ) = 0;
@@ -29,6 +30,7 @@ class Domain {
         virtual void getRewards( int* to_fill,
                                  void* state ) = 0;
 
+        /*__device__ __host__*/
         virtual int randomAction( void* state,
                                   BitMask* to_exclude ) = 0;
 

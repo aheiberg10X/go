@@ -50,7 +50,7 @@ int main(){
     }
 
 
-    if( false ){
+    if( true ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;
         void* uncast_state = (void*) gs;
@@ -74,7 +74,7 @@ int main(){
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
     //work in fixed memory
-    if( true ){
+    if( false ){
 
         //string name = "original";
         //GoState* state = new GoState( false );

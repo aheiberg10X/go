@@ -6,8 +6,10 @@
 #include "queue.h"
 #include "bitmask.h"
 
-/*#include <cuda.h>*/
-/*#include <cuda_runtime.h>*/
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
 
 #include <string>
 #include <sstream>
@@ -35,7 +37,9 @@ struct GoStateStruct{
     //get the marked elements
     int floodfill_array[BOARDSIZE];
     int neighbor_array[8];
+    int internal_neighbor_array[8];
     int filtered_array[8];
+    int internal_filtered_array[8];
     char color_array[3];
 
     //data structure for floodFill
@@ -44,51 +48,77 @@ struct GoStateStruct{
     Queue queue;
 
     GoStateStruct();
-    void initGSS( );
-
+    /*__device__ __host__ GoStateStruct( void** pointers );*/
+    
     int numElementsToCopy();
 
-    void cudaAllocateAndCopy( void** pointers );
+    /*void cudaAllocateAndCopy( void** pointers );*/
 
+    __device__ __host__
     void freezeBoard();
-    void thawBoard();
-    void* copy( );
 
+    __device__ __host__
+    void thawBoard();
+
+    __host__
+    void* copy( );
+    
+    __device__ __host__ void copyInto( GoStateStruct* target );
+
+    __device__ __host__
     char flipColor( char c );
 
+    __device__ __host__
     bool sameAs( char* board, char player );
 
     /*bool sameAs( GoStateStruct* gss2 );*/
 
+    __device__ __host__
     void togglePlayer( );
 
+    __host__
     string toString( );
+
+    __host__
     string boardToString( char* board );
 
+    __device__ __host__ 
     int neighbor( int ix, DIRECTION dir);
 
+    __device__ __host__
     int ix2action( int ix, char player );
 
+    __device__ __host__
     int action2ix( int action );
 
+    __device__ __host__
     char action2color( int action );
 
+    __device__ __host__
     int ix2color( int ix );
 
+    __device__ __host__
     int coord2ix( int i, int j );
 
+    __device__ __host__
     int ixColor2Action( int ix, char color );
 
+    __device__ __host__
     int coordColor2Action( int i, int j, char color );
 
+    __device__ __host__
     bool isPass( int action );
 
+    __device__ __host__
     void setBoard( int ix, char color );
 
+    __device__ __host__
     void setBoard( int* ixs, int len, char color );
 
+    __device__ __host__
     void neighborsOf( int* to_fill, int ix, int adjacency );
 
+    __device__ __host__
     void filterByColor(  
                         int* to_fill, 
                         int* to_fill_len,
@@ -98,6 +128,7 @@ struct GoStateStruct{
                         int filter_len );
 
 
+    __device__ __host__
     bool floodFill(  
                     int* to_fill,
                     int* to_fill_len,
@@ -109,15 +140,34 @@ struct GoStateStruct{
                     int stop_len );
 
 
+    __device__ __host__
     bool isSuicide( int action );
 
+    __device__ __host__
     void freezeBoard( char* target );
+
+    __device__ __host__
     void setBoard( char* target );
 
+    __device__ __host__
     bool isDuplicatedByPastState();
+
+    __device__ __host__
     void advancePastStates( char* past_board,
                             char past_player,
                             int past_action );
+
+    __device__ __host__ 
+    bool applyAction( int action, bool side_effects );
+
+    __device__ 
+    int randomAction( curandState* crs, int tid, BitMask* to_exclude );
+
+    __device__ __host__
+    bool isTerminal();
+
+    __device__ __host__
+    void getRewards( int* to_fill );
 
 };
 

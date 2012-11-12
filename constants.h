@@ -5,6 +5,8 @@
 #define BIGDIM 11
 #define BOARDSIZE (BIGDIM*BIGDIM)
 #define PAST_STATE_SIZE (BOARDSIZE*NUM_PAST_STATES) 
+#define ADJACENCY 8
+#define ADJ_PLUS_ONE (ADJACENCY+1)
 
 #define MOD 32
 #define BITMASK_SIZE 4  //BOARDSIZE/MOD + 1
@@ -15,6 +17,7 @@
 #define OFFBOARD 'o'
 
 #define PASS 0
+#define EXCLUDED_ACTION -123
 
 enum DIRECTION {
     N = 0,

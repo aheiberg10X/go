@@ -185,18 +185,15 @@ void MCTS::defaultPolicy( int* rewards,
             break;
         }
         action = domain->randomAction( uncast_state, &to_exclude );
-        cout << "actionasdf: " << action << endl;
+        //cout << "actionasdf: " << action << endl;
         //GoStateStruct* state = (GoStateStruct*) uncast_state;
         
         domain->applyAction( uncast_state, action, true );
-        cout << "applied" << endl;
+        //cout << "applied" << endl;
         count++;
     }
    
-    cout <<"wtfhehehehe" << endl; 
-    cout << "one" << endl;
     domain->getRewards( rewards, uncast_state );
-    cout << "two" << endl;
 
 }
 
