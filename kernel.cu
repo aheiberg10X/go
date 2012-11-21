@@ -1023,129 +1023,137 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     //GoStateStruct gssp;
     //GoStateStruct* gss = &gssp;
 
+    int white_win = 0;
+    int black_win = 0;
     //setup rand generators on kernel
-    curandState* devStates;
-    checkCudaErrors( cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) ) );
-    setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
+    if( USE_GPU ){
+        curandState* devStates;
+        checkCudaErrors( cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) ) );
+        setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
 
-///////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////
 
-    //printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
+        //printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
 
-    GoStateStruct* dev_gss;
-    cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
-    cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
+        GoStateStruct* dev_gss;
+        cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
+        cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
+        
+        int ta = clock();
+        //printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
+
+        int winner_elems = NUM_SIMULATIONS*2;
+        int winners[winner_elems];
+        int* dev_winners;
+        int sizeof_winners = winner_elems*sizeof(int); 
+        cudaMalloc( (void**)&dev_winners, sizeof_winners );
+
+        int iteration_elems = NUM_SIMULATIONS;
+        int iterations[iteration_elems];
+        int* dev_iterations;
+        int sizeof_iterations = iteration_elems*sizeof(int);
+        cudaMalloc( (void**)&dev_iterations, sizeof_iterations );
+
+        //printf("calling kernel\n");
+        
+        //this is the default, setting it to PreferL1 slowed down 3x
+        cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
+
+        leafSim<<<NUM_SIMULATIONS, 1>>>(dev_gss, 
+                                   devStates, 
+                                   dev_winners,
+                                   dev_iterations );
+        cudaThreadSynchronize();
+
+        int t = clock();
+        //printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
+
+        //cudaMemcpy( winners2, dev_winners2, NUM_SIMULATIONS*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
+        cudaMemcpy( winners, dev_winners, sizeof_winners, cudaMemcpyDeviceToHost );
+        cudaMemcpy( iterations, dev_iterations, sizeof_iterations, cudaMemcpyDeviceToHost );
+        
+        t = clock();
+        //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
+
+
+        //For histogram of game lengths
+        int iteration_counts[MAX_MOVES];
+        for( int i=0; i<MAX_MOVES; i++ ){
+            iteration_counts[i] = 0;
+        }
+
+        for( int i=0; i<NUM_SIMULATIONS; i++ ){
+            if( winners[i*2] == 1 ){
+               white_win++;
+            }
+            else if( winners[i*2+1] == 1 ){
+                black_win++;
+            }
+            //printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
+            //printf( "Took: %d steps\n\n", iterations[i] );
+            //printf("%d - %d\n", winners[i*2], winners[i*2+1] );
+            //printf("%d\n\n", iterations[i] );
+            iteration_counts[iterations[i]]++;
+
+        }
+
+        /*
+        int cdf_sum = 0;
+        for( int i=0; i<MAX_MOVES; i++ ){
+            if( iteration_counts[i] > 0 ){
+                printf( "%d steps : %d\n", i, iteration_counts[i] );
+                cdf_sum += iteration_counts[i];
+                printf( "cdf: %f\n\n", cdf_sum / ((float)NUM_SIMULATIONS) );
+            }
+        }
+        */
+        cudaFree( dev_gss );
+        cudaFree( dev_winners );
+        cudaFree( dev_iterations );
+        cudaFree( devStates );
+
+        int tb = clock();
+
+        //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+
     
-    int t = clock();
-    //printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
-
-    int winner_elems = NUM_SIMULATIONS*2;
-    int winners[winner_elems];
-    int* dev_winners;
-    int sizeof_winners = winner_elems*sizeof(int); 
-    cudaMalloc( (void**)&dev_winners, sizeof_winners );
-
-    int iteration_elems = NUM_SIMULATIONS;
-    int iterations[iteration_elems];
-    int* dev_iterations;
-    int sizeof_iterations = iteration_elems*sizeof(int);
-    cudaMalloc( (void**)&dev_iterations, sizeof_iterations );
-
-    //printf("calling kernel\n");
-    
-    //this is the default, setting it to PreferL1 slowed down 3x
-    cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
-
-    leafSim<<<NUM_SIMULATIONS, 1>>>(dev_gss, 
-                               devStates, 
-                               dev_winners,
-                               dev_iterations );
-    cudaThreadSynchronize();
-
-    t = clock();
-    //printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-
-    //cudaMemcpy( winners2, dev_winners2, NUM_SIMULATIONS*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
-    cudaMemcpy( winners, dev_winners, sizeof_winners, cudaMemcpyDeviceToHost );
-    cudaMemcpy( iterations, dev_iterations, sizeof_iterations, cudaMemcpyDeviceToHost );
-    
-    t = clock();
-    //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-
-    int white_win_dev = 0;
-    int black_win_dev = 0;
-    int white_win_host = 0;
-
-    //For histogram of game lengths
-    int iteration_counts[MAX_MOVES];
-    for( int i=0; i<MAX_MOVES; i++ ){
-        iteration_counts[i] = 0;
     }
+    else{
+        int ta = clock();
+        for( int i=0; i<NUM_SIMULATIONS; i++ ){
+            GoStateStruct linear;
+            BitMask to_exclude;
+            int count = 0;
+            int rewards[2];
+            while( count < MAX_MOVES && !linear.isTerminal() ){
+                int action = linear.randomAction( &to_exclude );
+                //bool is_legal = gss_local.applyAction( 48, true );
+                bool is_legal = linear.applyAction( action, true );
+                //printf( "%s\n\n", linear.toString().c_str() );
+                count++;
+            }
+            linear.getRewards( rewards );
+            if( rewards[0] == 1 ){
+                white_win++;
+            }
+            else if( rewards[1] == 1 ){
+                black_win++;
+            }
 
-    for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        if( winners[i*2] == 1 ){
-           white_win_dev++;
-        }
-        else if( winners[i*2+1] == 1 ){
-            black_win_dev++;
-        }
-        //printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
-        //printf( "Took: %d steps\n\n", iterations[i] );
-        //printf("%d - %d\n", winners[i*2], winners[i*2+1] );
-        //printf("%d\n\n", iterations[i] );
-        iteration_counts[iterations[i]]++;
 
+        }
+        int tb = clock();
+        //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+        
     }
-    assert( white_win_dev+black_win_dev == NUM_SIMULATIONS );
-
-    /*
-    int cdf_sum = 0;
-    for( int i=0; i<MAX_MOVES; i++ ){
-        if( iteration_counts[i] > 0 ){
-            printf( "%d steps : %d\n", i, iteration_counts[i] );
-            cdf_sum += iteration_counts[i];
-            printf( "cdf: %f\n\n", cdf_sum / ((float)NUM_SIMULATIONS) );
-        }
-    }
-    */
-    
-
-    /*
-    int ta = clock();
-    for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        GoStateStruct linear;
-        BitMask to_exclude;
-        int count = 0;
-        int rewards[2];
-        while( count < MAX_MOVES && !linear.isTerminal() ){
-            int action = linear.randomAction( &to_exclude );
-            //bool is_legal = gss_local.applyAction( 48, true );
-            bool is_legal = linear.applyAction( action, true );
-            //printf( "%s\n\n", linear.toString().c_str() );
-            count++;
-        }
-        linear.getRewards( rewards );
-        if( rewards[0] == 1 ){
-            white_win_host++;
-        }
-
-
-    }
-    int tb = clock();
-    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-    */
-    
     //printf( "dev white win count: %d\n", white_win_dev );
     //printf( "host white win count: %d\n", white_win_host );
 
-    cudaFree( dev_gss );
-    cudaFree( dev_winners );
-    cudaFree( dev_iterations );
-    cudaFree( devStates );
-
-    rewards[0] = white_win_dev;
-    rewards[1] = black_win_dev;
+    
+    assert( white_win+black_win == NUM_SIMULATIONS );
+    rewards[0] = white_win;
+    rewards[1] = black_win;
     
     return 0;
 }

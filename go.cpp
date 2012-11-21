@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <iostream>
+#include <time.h>
 
 using namespace std;
 
@@ -39,7 +40,7 @@ int main(){
     cout << action << endl;
     */
 
-    if( false ){
+    if( true ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;
         void* uncast_state = (void*) gs;
@@ -48,7 +49,10 @@ int main(){
         cout << "yeesh" << endl;
 
         while( !domain->isTerminal( uncast_state ) ){
+            int ta = clock();
             int best_action = mcts.search( uncast_state );
+            int tb = clock();
+            cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
             cout << "Best Action: " << best_action << endl;
             domain->applyAction( uncast_state, best_action, true );
             cout << "Applying action: " << best_action << endl;

@@ -23,8 +23,9 @@
 #define EXCLUDED_ACTION -123
 
 //Simulations
+#define USE_GPU false 
 #define MAX_MOVES BOARDSIZE
-#define NUM_SIMULATIONS 2000
+#define NUM_SIMULATIONS 1000
 #define NUM_ITERATIONS 1000
 
 enum DIRECTION {
