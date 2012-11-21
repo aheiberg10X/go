@@ -6,9 +6,13 @@ CMPLR = nvcc
 #all:  clean go
 #all: cleango goonly
 all: clean shared
+#all: clean benchmark
 
-shared: kernel.o godomain.o
-	nvcc -o kernel godomain.o kernel.o
+benchmark: kernel.o 
+	nvcc -o kernel kernel.o
+
+shared: kernel.o godomain.o mcts.o go.o
+	nvcc -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o
 
 kernel.o:
 	nvcc -c kernel.cu

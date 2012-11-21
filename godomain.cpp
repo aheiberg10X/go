@@ -47,12 +47,10 @@ public :
     };
 
     void deleteState( void* state ) {
-        cout << "commented out deleteState" << endl;
-        //GoStateStruct* gs = (GoStateStruct*) state;
-        //delete gs;
-        //return;
+        free(state);
     }
 
+    /* See domain.h */
     bool applyAction( void* uncast_state, 
                       int action,
                       bool side_effects ){
@@ -62,8 +60,13 @@ public :
         GoStateStruct* state = (GoStateStruct*) uncast_state;
         return state->applyAction( action, side_effects );
     }
+    
 
     //deprecated, in kernel
+    void getRewards( int* to_fill,
+                     void* uncast_state ){
+        ((GoStateStruct*) uncast_state)->getRewards( to_fill );
+    }
     /*
     void getRewards( int* to_fill,
                      void* uncast_state ){
@@ -226,6 +229,10 @@ public :
 
     //return an unsigned action, i.e an ix in the board
     //deprecated, in kernel
+    int randomAction( void* uncast_state, 
+                      BitMask* to_exclude ){
+        return ((GoStateStruct*) uncast_state)->randomAction(to_exclude);
+    }
     /* 
     int randomAction( void* uncast_state,
                       BitMask* to_exclude ){
@@ -293,6 +300,10 @@ public :
 
     bool isChanceAction( void* state ){
         return false;
+    }
+
+    bool isTerminal( void* uncast_state ){
+        return ((GoStateStruct*) uncast_state)->isTerminal();
     }
 
     //deprecated, in knernel 

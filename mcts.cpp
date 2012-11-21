@@ -4,7 +4,7 @@
 
 //for debugging
 #include "gostate_struct.h"
-//#include "kernel.cpp"
+#include "kernel.h"
 
 using namespace std;
 
@@ -24,17 +24,19 @@ int MCTS::search( void* root_state ){
     int rewards[num_players];
 
     int iterations = 0;
-    while( iterations < 1000 ){
+    while( iterations < NUM_ITERATIONS ){
         state = domain->copyState(root_state);
-        cout << endl << endl << "iteration: " << iterations << endl;
-        cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
+        //cout << endl << endl << "iteration: " << iterations << endl;
+        //cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
         node = treePolicy( root_node, state );
 
-        cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
-        defaultPolicy( rewards, state );
-        cout << "state after simulation: " << ((GoStateStruct*) state)->toString() << endl;
+        //cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
+        //defaultPolicy( rewards, state );
+        launchSimulationKernel( (GoStateStruct*) state, rewards );
 
+        //TODO can't really do this anymore, we have many playout results
+        //cout << "state after simulation: " << ((GoStateStruct*) state)->toString() << endl;
         //cout << "rewards: " << rewards[0] << "," << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
@@ -194,8 +196,6 @@ void MCTS::defaultPolicy( int* rewards,
 
 }
 
-void MCTS::goSimulationKernel( int* rewards, void* uncast_state ){
-}
 
 void MCTS::backprop( MCTS_Node* node, 
                      int*       rewards,

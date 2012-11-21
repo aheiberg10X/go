@@ -1,24 +1,31 @@
 #ifndef CONSTANTS
 #define CONSTANTS
 
+
+//GoStateStruct Constants
 #define NUM_PAST_STATES 2 
-#define BIGDIM 21 
+#define BIGDIM 6 
 #define BOARDSIZE (BIGDIM*BIGDIM)
-#define MAX_ITERATIONS BOARDSIZE
 #define PAST_STATE_SIZE (BOARDSIZE*NUM_PAST_STATES) 
 #define ADJACENCY 8
 #define ADJ_PLUS_ONE (ADJACENCY+1)
 
+//bitmask constants
 #define MOD 32
 #define BITMASK_SIZE (BOARDSIZE/MOD + 1)
 
+//useful
 #define BLACK 'b'
 #define WHITE 'w'
 #define EMPTY 'e'
 #define OFFBOARD 'o'
-
 #define PASS 0
 #define EXCLUDED_ACTION -123
+
+//Simulations
+#define MAX_MOVES BOARDSIZE
+#define NUM_SIMULATIONS 2000
+#define NUM_ITERATIONS 1000
 
 enum DIRECTION {
     N = 0,

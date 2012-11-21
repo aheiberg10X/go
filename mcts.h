@@ -43,7 +43,7 @@ public :
     void defaultPolicy( int*    rewards, 
                         void*   state );
 
-    __global__ void goSimulationKernel( int* rewards, void* state );
+    /*void launchSimulationKernel();*/
 
     void backprop( MCTS_Node* node, 
                    int*       rewards,

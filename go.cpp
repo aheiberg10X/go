@@ -21,36 +21,25 @@ int main(){
     srand(time(NULL));
 
     /*
-    if( false ){
-        Queue q (4);
-        q.push(7);
-        q.push(8);
-        q.push(9);
-        q.push(10);
-        cout << q.pop() << endl;
-        cout << q.pop() << endl;
-        cout << q.pop() << endl;
-        cout << q.pop() << endl;
-        cout << q.isEmpty() << endl;
-    }*/
-
-    
-    if( false ){
-        BitMask bm;
-        bm.set(1,false);
-        cout << bm.get(1) << endl;
-        bm.set(1,true);
-        cout << bm.get(1) << endl;
-        bm.set(44,true);
-        cout << bm.get(44) << endl;
-        bm.set(44,false);
-        cout << bm.get(44) << endl;
-
-
+    GoStateStruct state;
+    int bi[9] = {1,1,2,2,2,2,3,3,4};
+    int bj[9] = {2,3,1,2,3,4,3,4,3};
+    int wi[3] = {3,3,4};
+    int wj[3] = {1,2,2};
+    for( int i=0; i<9; i++ ){
+        state.setBoard( state.coord2ix( bi[i], bj[i] ), BLACK );
+    }
+    for( int i=0; i<3; i++ ){
+        state.setBoard( state.coord2ix( wi[i], wj[i] ), WHITE );
     }
 
+    cout << state.toString() << endl;
+    BitMask empty;
+    int action = state.randomAction( &empty );
+    cout << action << endl;
+    */
 
-    if( true ){
+    if( false ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;
         void* uncast_state = (void*) gs;
@@ -65,7 +54,7 @@ int main(){
             cout << "Applying action: " << best_action << endl;
             cout << "Resulting state: " << ((GoStateStruct* ) uncast_state)->toString(  ) << endl;
             cout << "hit any key..." << endl;
-
+            
             cin.ignore();
         }
         
@@ -74,6 +63,7 @@ int main(){
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
     //work in fixed memory
+    /*
     if( false ){
 
         //string name = "original";
@@ -115,35 +105,8 @@ int main(){
         }
         cout << state->toString() << endl;
          
-/*
-        GoDomain gd;
-
-        BitMask to_exclude;
-        to_exclude.initBitMask();
-        while( ! gd.isTerminal( *p_uncast_state ) ){
-            //cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-            //cout << "current state: " << state->toString() << endl;
-            //cout << "last state: " << state->past_states[NUM_PAST_STATES-1]->toString() << endl;
-            int raction = gd.randomAction( p_uncast_state, &to_exclude );
-            cout << "\napplying rand act: " << raction << " to: \n" << state->toString() << endl;
-            gd.applyAction( p_uncast_state, raction, true );
-
-        }
-        cout << "finished" << endl;
-
-        int rewards[2];
-        state = (GoStateStruct*) *p_uncast_state;
-        gd.getRewards( rewards, *p_uncast_state );
-        cout << "white_score: " << rewards[0] << " black_score: " << rewards[1] << endl;
-*/
-
-        //cout << "isTerminal: " << gd.isTerminal( (void*) s&tate ) << endl;
-        //action = s.coordColor2Action( 4,3,WHITE );
-        //gd.applyAction( (void*) &s, action, true );
-        //s.setBoard( s.coord2ix(2,1), WHITE );
-        //cout << "is suicide: " << s.isSuicide( s.coord2ix(2,1) ) << endl;
     }
-
+    */
 
 
     return 0;

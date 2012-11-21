@@ -3,7 +3,9 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include "../go/gostate_struct.h"
+#include "gostate_struct.h"
+#include "kernel.h"
+
 #include "godomain.cpp"
 
 #include <time.h>
@@ -26,7 +28,6 @@ inline void __checkCudaErrors(cudaError err, const char *file, const int line )
       return EXIT_FAILURE;}} while(0)
 
 
-const int num_blocks = 500;
 const int num_elems = 10;
 //generate a random number for the ind'th block
 __device__ float generate( curandState* globalState, int ind ){
@@ -933,6 +934,7 @@ bool Queue::isEmpty(){
 }
 
 ////////////////////////////////////////////////////////////////////////////
+//             Kernels
 ////////////////////////////////////////////////////////////////////////////
 
 
@@ -968,7 +970,7 @@ __global__ void stochasticSwapper( int* a,
 
 }
 
-__global__ void setup_kernel( curandState* state, unsigned long seed ){
+__global__ void setupRandomGenerators( curandState* state, unsigned long seed ){
     int tid = blockIdx.x;
     curand_init( seed+tid, tid, 0, &state[tid] );
 }
@@ -989,7 +991,7 @@ __global__ void reconstruct( void** pointers, int* results ){
 }
 */
 
-__global__ void reconstructGoState( GoStateStruct* gss,
+__global__ void leafSim( GoStateStruct* gss,
                                     curandState* globalState, 
                                     int* winners,
                                     int* iterations ){
@@ -1000,9 +1002,8 @@ __global__ void reconstructGoState( GoStateStruct* gss,
     gss->copyInto( &gss_local );
     BitMask to_exclude;
     int count = 0;
-    while( count < MAX_ITERATIONS && !gss_local.isTerminal() ){
+    while( count < MAX_MOVES && !gss_local.isTerminal() ){
         int action = gss_local.randomAction( globalState, tid, &to_exclude );
-    //bool is_legal = gss_local.applyAction( 48, true );
         bool is_legal = gss_local.applyAction( action, true );
         count++;
     }
@@ -1016,103 +1017,108 @@ __global__ void reconstructGoState( GoStateStruct* gss,
 
 }
 
-
-int main(void){
-    srand( time(NULL) );
+int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
+    //int main(void){
+    //srand( time(NULL) );
+    //GoStateStruct gssp;
+    //GoStateStruct* gss = &gssp;
 
     //setup rand generators on kernel
     curandState* devStates;
-    checkCudaErrors( cudaMalloc( &devStates, num_blocks*sizeof(curandState) ) );
-    setup_kernel<<<num_blocks,1>>>( devStates, time(NULL) );
+    checkCudaErrors( cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) ) );
+    setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
 
 ///////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
-    GoStateStruct gss;
 
-    printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
+    //printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
 
-    
     GoStateStruct* dev_gss;
     cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
-    cudaMemcpy( dev_gss, &gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
+    cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
     
     int t = clock();
-    printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
+    //printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
 
-    int winner_elems = num_blocks*2;
+    int winner_elems = NUM_SIMULATIONS*2;
     int winners[winner_elems];
     int* dev_winners;
     int sizeof_winners = winner_elems*sizeof(int); 
     cudaMalloc( (void**)&dev_winners, sizeof_winners );
 
-    int iteration_elems = num_blocks;
+    int iteration_elems = NUM_SIMULATIONS;
     int iterations[iteration_elems];
     int* dev_iterations;
     int sizeof_iterations = iteration_elems*sizeof(int);
     cudaMalloc( (void**)&dev_iterations, sizeof_iterations );
 
-    printf("calling kernel\n");
+    //printf("calling kernel\n");
     
     //this is the default, setting it to PreferL1 slowed down 3x
-    cudaFuncSetCacheConfig(reconstructGoState, cudaFuncCachePreferShared );
+    cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
 
-    reconstructGoState<<<num_blocks, 1>>>(dev_gss, 
-                                          devStates, 
-                                          dev_winners,
-                                          dev_iterations );
+    leafSim<<<NUM_SIMULATIONS, 1>>>(dev_gss, 
+                               devStates, 
+                               dev_winners,
+                               dev_iterations );
     cudaThreadSynchronize();
 
-
-
     t = clock();
-    printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
+    //printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
 
-    //cudaMemcpy( winners2, dev_winners2, num_blocks*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
+    //cudaMemcpy( winners2, dev_winners2, NUM_SIMULATIONS*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
     cudaMemcpy( winners, dev_winners, sizeof_winners, cudaMemcpyDeviceToHost );
     cudaMemcpy( iterations, dev_iterations, sizeof_iterations, cudaMemcpyDeviceToHost );
     
     t = clock();
-    printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
+    //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
 
-    
-    int total_white_winners_dev = 0;
-    int total_white_winners_host = 0;
+    int white_win_dev = 0;
+    int black_win_dev = 0;
+    int white_win_host = 0;
 
     //For histogram of game lengths
-    int iteration_counts[MAX_ITERATIONS];
-    for( int i=0; i<MAX_ITERATIONS; i++ ){
+    int iteration_counts[MAX_MOVES];
+    for( int i=0; i<MAX_MOVES; i++ ){
         iteration_counts[i] = 0;
     }
 
-    for( int i=0; i<num_blocks; i++ ){
+    for( int i=0; i<NUM_SIMULATIONS; i++ ){
         if( winners[i*2] == 1 ){
-           total_white_winners_dev++;
+           white_win_dev++;
+        }
+        else if( winners[i*2+1] == 1 ){
+            black_win_dev++;
         }
         //printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
         //printf( "Took: %d steps\n\n", iterations[i] );
+        //printf("%d - %d\n", winners[i*2], winners[i*2+1] );
+        //printf("%d\n\n", iterations[i] );
         iteration_counts[iterations[i]]++;
+
     }
+    assert( white_win_dev+black_win_dev == NUM_SIMULATIONS );
 
     /*
     int cdf_sum = 0;
-    for( int i=0; i<MAX_ITERATIONS; i++ ){
+    for( int i=0; i<MAX_MOVES; i++ ){
         if( iteration_counts[i] > 0 ){
             printf( "%d steps : %d\n", i, iteration_counts[i] );
             cdf_sum += iteration_counts[i];
-            printf( "cdf: %f\n\n", cdf_sum / ((float)num_blocks) );
+            printf( "cdf: %f\n\n", cdf_sum / ((float)NUM_SIMULATIONS) );
         }
     }
     */
     
 
-    
+    /*
     int ta = clock();
-    for( int i=0; i<num_blocks; i++ ){
+    for( int i=0; i<NUM_SIMULATIONS; i++ ){
         GoStateStruct linear;
         BitMask to_exclude;
         int count = 0;
         int rewards[2];
-        while( count < MAX_ITERATIONS && !linear.isTerminal() ){
+        while( count < MAX_MOVES && !linear.isTerminal() ){
             int action = linear.randomAction( &to_exclude );
             //bool is_legal = gss_local.applyAction( 48, true );
             bool is_legal = linear.applyAction( action, true );
@@ -1121,86 +1127,26 @@ int main(void){
         }
         linear.getRewards( rewards );
         if( rewards[0] == 1 ){
-            total_white_winners_host++;
+            white_win_host++;
         }
 
 
     }
     int tb = clock();
     printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+    */
     
-    printf( "dev white win count: %d\n", total_white_winners_dev );
-    printf( "host white win count: %d\n", total_white_winners_host );
+    //printf( "dev white win count: %d\n", white_win_dev );
+    //printf( "host white win count: %d\n", white_win_host );
 
-    //cudaFree( dev_gss );
-    //cudaFree( dev_winners );
-    //cudaFree( dev_iterations );
-    //cudaFree( devStates );
+    cudaFree( dev_gss );
+    cudaFree( dev_winners );
+    cudaFree( dev_iterations );
+    cudaFree( devStates );
+
+    rewards[0] = white_win_dev;
+    rewards[1] = black_win_dev;
     
-    
-    ////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////
-    /*
-    SimpleClass sc;
-    int num_copy = sc.numElementsToCopy();
-    //char* types = new char[num_copy];
-    //void** pointers = new void*[num_copy];
-    void* pointers[num_copy];
-    void** dev_pointers;
-    //int* sizes = new int[num_copy];
-    sc.cudaAllocateAndCopy(pointers);
-    
-    cudaMalloc( (void***)&dev_pointers, num_copy*sizeof(void*) );
-    cudaMemcpy( dev_pointers, pointers, num_copy*sizeof(void*), cudaMemcpyHostToDevice);
-
-    int results2[num_blocks];
-    int* dev_results2;
-    checkCudaErrors( cudaMalloc( (void**)&dev_results2, num_blocks*sizeof(int) ) );
-    reconstruct<<<num_blocks,1>>>( dev_pointers, dev_results2);
-
-    checkCudaErrors( cudaMemcpy( results2, dev_results2, num_blocks*sizeof(int), cudaMemcpyDeviceToHost ) );
-
-    for( int i=0; i<num_blocks; i++){
-        printf("%d, ", results2[i]);
-    }
-    printf("\n");
-
-    for( int i=0; i<num_copy; i++ ){
-        cudaFree( pointers[i] );
-    }
-*/
-    //////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////
-/*
-    checkCudaErrors( cudaMalloc( (void**)&dev_a, num_elems * sizeof(int) ) );
-    checkCudaErrors( cudaMalloc( (void**)&dev_results, num_elems * num_blocks * sizeof(int) ) );
-
-    checkCudaErrors( cudaMemcpy( dev_a, a, num_elems * sizeof(int),
-                              cudaMemcpyHostToDevice ) );
-
-    stochasticSwapper<<<num_blocks,1>>>(dev_a, dev_results, devStates);
-
-    //copy back
-    checkCudaErrors( cudaMemcpy( results, 
-                                 dev_results, 
-                                 num_elems*num_blocks*sizeof(int), 
-                                 cudaMemcpyDeviceToHost ) );
-
-    for( int i=0; i<num_blocks; i++ ){
-        for( int j=0; j<num_elems; j++ ){
-            int ix = i*num_elems+j;
-            //printf("ix: %d", ix );
-            printf("%d,", results[ix] );
-        }
-        printf( "\n" );
-    }
-
-    cudaFree( dev_a );
-    cudaFree( dev_results );
-    //cudaFree( dev_results2 );
-    //TODO
-    //cudaFree( everything allocated by sc.cudaAllocate )
-*/
     return 0;
 }
 
