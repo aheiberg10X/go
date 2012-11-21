@@ -163,6 +163,9 @@ struct GoStateStruct{
     __device__ 
     int randomAction( curandState* crs, int tid, BitMask* to_exclude );
 
+    __host__ 
+    int randomAction( BitMask* to_exclude );
+
     __device__ __host__
     bool isTerminal();
 

@@ -7,11 +7,11 @@ CMPLR = nvcc
 #all: cleango goonly
 all: clean shared
 
-shared: shared_mem.o godomain.o
-	nvcc -o shared godomain.o shared_mem.o
+shared: kernel.o godomain.o
+	nvcc -o kernel godomain.o kernel.o
 
-shared_mem.o:
-	nvcc -c shared_mem.cu
+kernel.o:
+	nvcc -c kernel.cu
 
 goonly: go.o
 	${CMPLR} -o go ${LINKS} *.o 
@@ -49,4 +49,4 @@ cleango:
 	rm -f go.o go
 
 clean:
-	rm -rf *.o go shared
+	rm -rf *.o go kernel

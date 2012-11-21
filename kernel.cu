@@ -25,7 +25,8 @@ inline void __checkCudaErrors(cudaError err, const char *file, const int line )
       printf("Error at %s:%d\n",__FILE__,__LINE__);            \
       return EXIT_FAILURE;}} while(0)
 
-const int num_blocks = 10;
+
+const int num_blocks = 500;
 const int num_elems = 10;
 //generate a random number for the ind'th block
 __device__ float generate( curandState* globalState, int ind ){
@@ -622,7 +623,7 @@ bool GoStateStruct::applyAction( int action,
                                       player,
                                       action );
 
-            action = action;
+            this->action = action;
             togglePlayer();
         }
         else{
@@ -666,6 +667,56 @@ int GoStateStruct::randomAction( curandState* globalState,
             else{
                 //j = rand() % i;
                 j = (int) ( generate(globalState,tid) * i );
+                empty_ixs[i] = empty_ixs[j];
+                empty_ixs[j] = ix;
+            }
+            i++;
+        }
+    }
+    //cout << "after shuffled" << endl;
+
+    //try each one to see if legal
+    bool legal_moves_available = false;
+    int candidate;
+    for( int j=0; j<size; j++ ){
+        candidate = empty_ixs[j];
+        bool is_legal = applyAction( candidate, false );
+        if( is_legal ){
+            legal_moves_available = true;
+            if( !to_exclude->get( candidate ) ){
+                return candidate;
+            }
+        }
+    }
+
+    if( legal_moves_available ){ //but all were excluded...
+        return EXCLUDED_ACTION;
+    }
+    else {
+        return PASS;
+    }
+}
+
+__host__
+int GoStateStruct::randomAction( BitMask* to_exclude ){
+    //cout << "inside randomAction" << endl;
+    //GoStateStruct* state = (GoStateStruct*) uncast_state;
+    int size = num_open; //state->open_positions.size();
+    int empty_ixs[ BOARDSIZE /*size*/  ];
+    //cout << "size: " << size << endl;
+
+    int i = 0;
+    int j;
+    //can shuffle randomly as we insert...
+    for( int ix=0; ix<BOARDSIZE; ix++ ){
+        //cout << "random shuffle i: " << i << endl;
+        if( board[ix] == EMPTY ){
+            if( i == 0 ){
+                empty_ixs[0] = ix;
+            }
+            else{
+                j = rand() % i;
+                //j = (int) ( generate(globalState,tid) * i );
                 empty_ixs[i] = empty_ixs[j];
                 empty_ixs[j] = ix;
             }
@@ -940,28 +991,27 @@ __global__ void reconstruct( void** pointers, int* results ){
 
 __global__ void reconstructGoState( GoStateStruct* gss,
                                     curandState* globalState, 
-                                    int* inputs, 
-                                    char* results,
-                                    int* winners ){
+                                    int* winners,
+                                    int* iterations ){
     int tid = blockIdx.x;
-    //int pos = inputs[tid];
 
     //will want
     __shared__ GoStateStruct gss_local;
     gss->copyInto( &gss_local );
     BitMask to_exclude;
     int count = 0;
-    while( count < 1000 && !gss_local.isTerminal() ){
+    while( count < MAX_ITERATIONS && !gss_local.isTerminal() ){
         int action = gss_local.randomAction( globalState, tid, &to_exclude );
     //bool is_legal = gss_local.applyAction( 48, true );
         bool is_legal = gss_local.applyAction( action, true );
         count++;
     }
 
-    for( int i=0; i<BOARDSIZE; i++ ){
-        results[tid*BOARDSIZE+i] = gss_local.board[i];
-    }
+    //for( int i=0; i<BOARDSIZE; i++ ){
+    //results[tid*BOARDSIZE+i] = gss_local.board[i];
+    //}
 
+    iterations[tid] = count;
     gss_local.getRewards( &(winners[tid*2]) );
 
 }
@@ -969,15 +1019,6 @@ __global__ void reconstructGoState( GoStateStruct* gss,
 
 int main(void){
     srand( time(NULL) );
-    int a[num_elems];
-    int* dev_a;
-    for( int i=0; i<num_elems; i++ ){
-        a[i] = i;
-    }
-
-
-    int results[num_blocks*num_elems];
-    int* dev_results;
 
     //setup rand generators on kernel
     curandState* devStates;
@@ -987,70 +1028,114 @@ int main(void){
 ///////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////
     GoStateStruct gss;
-    gss.setBoard( 49, WHITE );
-    //int num_copy2 = gss.numElementsToCopy();
-    //void* pointers2[num_copy2];
-    //gss.cudaAllocateAndCopy( pointers2 );
 
-    //void** dev_pointers2;
-    //cudaMalloc( (void***)&dev_pointers2, num_copy2*sizeof(void*) );
-    //cudaMemcpy( dev_pointers2, pointers2, num_copy2*sizeof(void*), cudaMemcpyHostToDevice);
+    printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
 
-    //void* pboard;
-    //cudaMalloc( (void**)&pboard, BOARDSIZE*sizeof(char) );
-    //cudaMemcpy( pboard, gss.board, BOARDSIZE*sizeof(char), cudaMemcpyHostToDevice );
-
+    
     GoStateStruct* dev_gss;
-    //gss = (GoStateStruct*) malloc(sizeof(GoStateStruct));
     cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
     cudaMemcpy( dev_gss, &gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
     
-    int inputs[num_blocks];
-    for( int i=0; i<num_blocks; i++ ){
-        int r = rand();
-        inputs[i] = r % BOARDSIZE;
-    }
-    
-    int* dev_inputs;
-    cudaMalloc( (void**)&dev_inputs, num_blocks*sizeof(int) );
-    cudaMemcpy( dev_inputs, inputs, num_blocks*sizeof(int), cudaMemcpyHostToDevice );
+    int t = clock();
+    printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
 
-    char results2[BOARDSIZE*num_blocks];
-    char* dev_results2;
-    checkCudaErrors( cudaMalloc( (void**)&dev_results2, num_blocks*BOARDSIZE*sizeof(char) ) );
+    int winner_elems = num_blocks*2;
+    int winners[winner_elems];
+    int* dev_winners;
+    int sizeof_winners = winner_elems*sizeof(int); 
+    cudaMalloc( (void**)&dev_winners, sizeof_winners );
 
-    int results3[num_blocks*2];
-    int* dev_results3;
-    cudaMalloc( (void**)&dev_results3, num_blocks*2*sizeof(int) );
+    int iteration_elems = num_blocks;
+    int iterations[iteration_elems];
+    int* dev_iterations;
+    int sizeof_iterations = iteration_elems*sizeof(int);
+    cudaMalloc( (void**)&dev_iterations, sizeof_iterations );
 
     printf("calling kernel\n");
+    
+    //this is the default, setting it to PreferL1 slowed down 3x
+    cudaFuncSetCacheConfig(reconstructGoState, cudaFuncCachePreferShared );
+
     reconstructGoState<<<num_blocks, 1>>>(dev_gss, 
                                           devStates, 
-                                          dev_inputs, 
-                                          dev_results2,
-                                          dev_results3 );
+                                          dev_winners,
+                                          dev_iterations );
+    cudaThreadSynchronize();
 
-    int t = clock();
+
+
+    t = clock();
     printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
 
-    cudaMemcpy( results2, dev_results2, num_blocks*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
-    cudaMemcpy( results3, dev_results3, num_blocks*2*sizeof(int), cudaMemcpyDeviceToHost );
+    //cudaMemcpy( winners2, dev_winners2, num_blocks*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
+    cudaMemcpy( winners, dev_winners, sizeof_winners, cudaMemcpyDeviceToHost );
+    cudaMemcpy( iterations, dev_iterations, sizeof_iterations, cudaMemcpyDeviceToHost );
     
     t = clock();
     printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-/*
-    for( int i=0; i<num_blocks; i++ ){
-        char* p = &(results2[i*BOARDSIZE]);
-        const char* s = gss.boardToString( p ).c_str();
-        printf("%s\n\n", s );
-        printf("%d to %d\n\n", results3[i*2], results3[i*2+1] );
 
-        //printf("%d : %c\n", i, results2[i]);
-    }*/
     
-    //for( int i=0; i<num_copy2; i++ ){
-    //cudaFree( pointers2[i] );
-    //}
+    int total_white_winners_dev = 0;
+    int total_white_winners_host = 0;
+
+    //For histogram of game lengths
+    int iteration_counts[MAX_ITERATIONS];
+    for( int i=0; i<MAX_ITERATIONS; i++ ){
+        iteration_counts[i] = 0;
+    }
+
+    for( int i=0; i<num_blocks; i++ ){
+        if( winners[i*2] == 1 ){
+           total_white_winners_dev++;
+        }
+        //printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
+        //printf( "Took: %d steps\n\n", iterations[i] );
+        iteration_counts[iterations[i]]++;
+    }
+
+    /*
+    int cdf_sum = 0;
+    for( int i=0; i<MAX_ITERATIONS; i++ ){
+        if( iteration_counts[i] > 0 ){
+            printf( "%d steps : %d\n", i, iteration_counts[i] );
+            cdf_sum += iteration_counts[i];
+            printf( "cdf: %f\n\n", cdf_sum / ((float)num_blocks) );
+        }
+    }
+    */
+    
+
+    
+    int ta = clock();
+    for( int i=0; i<num_blocks; i++ ){
+        GoStateStruct linear;
+        BitMask to_exclude;
+        int count = 0;
+        int rewards[2];
+        while( count < MAX_ITERATIONS && !linear.isTerminal() ){
+            int action = linear.randomAction( &to_exclude );
+            //bool is_legal = gss_local.applyAction( 48, true );
+            bool is_legal = linear.applyAction( action, true );
+            //printf( "%s\n\n", linear.toString().c_str() );
+            count++;
+        }
+        linear.getRewards( rewards );
+        if( rewards[0] == 1 ){
+            total_white_winners_host++;
+        }
+
+
+    }
+    int tb = clock();
+    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+    
+    printf( "dev white win count: %d\n", total_white_winners_dev );
+    printf( "host white win count: %d\n", total_white_winners_host );
+
+    //cudaFree( dev_gss );
+    //cudaFree( dev_winners );
+    //cudaFree( dev_iterations );
+    //cudaFree( devStates );
     
     
     ////////////////////////////////////////////////////////////////
@@ -1086,7 +1171,7 @@ int main(void){
 */
     //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
-
+/*
     checkCudaErrors( cudaMalloc( (void**)&dev_a, num_elems * sizeof(int) ) );
     checkCudaErrors( cudaMalloc( (void**)&dev_results, num_elems * num_blocks * sizeof(int) ) );
 
@@ -1115,7 +1200,7 @@ int main(void){
     //cudaFree( dev_results2 );
     //TODO
     //cudaFree( everything allocated by sc.cudaAllocate )
-
+*/
     return 0;
 }
 

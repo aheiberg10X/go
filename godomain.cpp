@@ -18,7 +18,6 @@
 
 using namespace std;
 
-
 class GoDomain : public Domain {
 public :
 
@@ -63,7 +62,9 @@ public :
         GoStateStruct* state = (GoStateStruct*) uncast_state;
         return state->applyAction( action, side_effects );
     }
-    
+
+    //deprecated, in kernel
+    /*
     void getRewards( int* to_fill,
                      void* uncast_state ){
         //cout << "start getRewards" << endl;
@@ -221,9 +222,11 @@ public :
         //cout << "end getRewards" << endl;
         return;
     }
+    */
 
     //return an unsigned action, i.e an ix in the board
-    /*
+    //deprecated, in kernel
+    /* 
     int randomAction( void* uncast_state,
                       BitMask* to_exclude ){
         //bool* to_exclude ){
@@ -292,6 +295,8 @@ public :
         return false;
     }
 
+    //deprecated, in knernel 
+    /*
     bool isTerminal( void* uncast_state ){
         //cout << "whoa there" << endl;
         GoStateStruct* state = (GoStateStruct*) uncast_state;
@@ -303,6 +308,7 @@ public :
         //cout << "wtf" << endl;
         return r;
     }
+    */
 
 };
 

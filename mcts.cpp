@@ -3,8 +3,8 @@
 #include <iostream>
 
 //for debugging
-//#include "gostate.h"
 #include "gostate_struct.h"
+//#include "kernel.cpp"
 
 using namespace std;
 
@@ -174,10 +174,7 @@ void MCTS::defaultPolicy( int* rewards,
     int count = 0;
     int action;
 
-    //GoState* s = ((GoState*) *p_uncast_state);
-    //BitMask to_exclude( s->boardsize );
     BitMask to_exclude;
-    //to_exclude.initBitMask();
 
     while( !domain->isTerminal( uncast_state) ){
         if( count > 1000 ){
@@ -195,6 +192,9 @@ void MCTS::defaultPolicy( int* rewards,
    
     domain->getRewards( rewards, uncast_state );
 
+}
+
+void MCTS::goSimulationKernel( int* rewards, void* uncast_state ){
 }
 
 void MCTS::backprop( MCTS_Node* node, 
