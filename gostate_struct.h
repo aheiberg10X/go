@@ -48,11 +48,8 @@ struct GoStateStruct{
     Queue queue;
 
     GoStateStruct();
-    /*__device__ __host__ GoStateStruct( void** pointers );*/
     
     int numElementsToCopy();
-
-    /*void cudaAllocateAndCopy( void** pointers );*/
 
     __device__ __host__
     void freezeBoard();

@@ -13,11 +13,11 @@ using namespace std;
 
 int main(){
     //cout << sizeof(COLOR) << endl;
-    cout << sizeof(int) << endl;
-    cout << sizeof(char) << endl;
-    cout << sizeof(bool) << endl;
-    cout << sizeof(GoStateStruct) << endl;
-    cout << PAST_STATE_SIZE << endl;
+    //cout << sizeof(int) << endl;
+    //cout << sizeof(char) << endl;
+    //cout << sizeof(bool) << endl;
+    //cout << sizeof(GoStateStruct) << endl;
+    //cout << PAST_STATE_SIZE << endl;
 
     srand(time(NULL));
 
@@ -45,8 +45,6 @@ int main(){
         GoStateStruct* gs = new GoStateStruct;
         void* uncast_state = (void*) gs;
         MCTS mcts(domain);
-
-        cout << "yeesh" << endl;
 
         while( !domain->isTerminal( uncast_state ) ){
             int ta = clock();

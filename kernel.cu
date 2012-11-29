@@ -3,14 +3,11 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <time.h>
+
 #include "gostate_struct.h"
 #include "kernel.h"
-
 #include "godomain.cpp"
-
-#include <time.h>
-//#include "simpleclass.cu"
-//#include "simplestruct.cu"
 
 // This will output the proper CUDA error strings in the event that a CUDA host call returns an error 
 #define checkCudaErrors(err)  __checkCudaErrors (err, __FILE__, __LINE__) 
@@ -992,12 +989,11 @@ __global__ void reconstruct( void** pointers, int* results ){
 */
 
 __global__ void leafSim( GoStateStruct* gss,
-                                    curandState* globalState, 
-                                    int* winners,
-                                    int* iterations ){
+                         curandState* globalState, 
+                         int* winners,
+                         int* iterations ){
     int tid = blockIdx.x;
 
-    //will want
     __shared__ GoStateStruct gss_local;
     gss->copyInto( &gss_local );
     BitMask to_exclude;
@@ -1007,10 +1003,6 @@ __global__ void leafSim( GoStateStruct* gss,
         bool is_legal = gss_local.applyAction( action, true );
         count++;
     }
-
-    //for( int i=0; i<BOARDSIZE; i++ ){
-    //results[tid*BOARDSIZE+i] = gss_local.board[i];
-    //}
 
     iterations[tid] = count;
     gss_local.getRewards( &(winners[tid*2]) );
@@ -1028,13 +1020,8 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     //setup rand generators on kernel
     if( USE_GPU ){
         curandState* devStates;
-        checkCudaErrors( cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) ) );
+        cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) );
         setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
-
-    ///////////////////////////////////////////////////////////////////
-        /////////////////////////////////////////////////////////////////////
-
-        //printf( "size of GoStateStruct: %d" , sizeof(GoStateStruct) );
 
         GoStateStruct* dev_gss;
         cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
@@ -1069,13 +1056,13 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         int t = clock();
         //printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
 
-        //cudaMemcpy( winners2, dev_winners2, NUM_SIMULATIONS*BOARDSIZE*sizeof(char), cudaMemcpyDeviceToHost );
-        cudaMemcpy( winners, dev_winners, sizeof_winners, cudaMemcpyDeviceToHost );
-        cudaMemcpy( iterations, dev_iterations, sizeof_iterations, cudaMemcpyDeviceToHost );
+        cudaMemcpy( winners, dev_winners, sizeof_winners, 
+                    cudaMemcpyDeviceToHost );
+        cudaMemcpy( iterations, dev_iterations, sizeof_iterations, 
+                    cudaMemcpyDeviceToHost );
         
         t = clock();
         //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-
 
         //For histogram of game lengths
         int iteration_counts[MAX_MOVES];
@@ -1083,6 +1070,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             iteration_counts[i] = 0;
         }
 
+        //count the number of wins for each side
         for( int i=0; i<NUM_SIMULATIONS; i++ ){
             if( winners[i*2] == 1 ){
                white_win++;
@@ -1116,24 +1104,24 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         int tb = clock();
 
         //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-
     
     }
     else{
+
         int ta = clock();
         for( int i=0; i<NUM_SIMULATIONS; i++ ){
-            GoStateStruct linear;
+            GoStateStruct* linear = (GoStateStruct*) gss->copy();
             BitMask to_exclude;
             int count = 0;
             int rewards[2];
-            while( count < MAX_MOVES && !linear.isTerminal() ){
-                int action = linear.randomAction( &to_exclude );
+            while( count < MAX_MOVES && !linear->isTerminal() ){
+                int action = linear->randomAction( &to_exclude );
                 //bool is_legal = gss_local.applyAction( 48, true );
-                bool is_legal = linear.applyAction( action, true );
+                bool is_legal = linear->applyAction( action, true );
                 //printf( "%s\n\n", linear.toString().c_str() );
                 count++;
             }
-            linear.getRewards( rewards );
+            linear->getRewards( rewards );
             if( rewards[0] == 1 ){
                 white_win++;
             }
@@ -1149,7 +1137,6 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     }
     //printf( "dev white win count: %d\n", white_win_dev );
     //printf( "host white win count: %d\n", white_win_host );
-
     
     assert( white_win+black_win == NUM_SIMULATIONS );
     rewards[0] = white_win;

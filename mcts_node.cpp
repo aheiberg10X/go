@@ -4,18 +4,12 @@
 #include <stdlib.h>
 using namespace std;
 
+//for initializing the root node
 MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     incCreated();
     num_players = anum_players;
     num_actions = anum_actions;
-    //tried_actions = new bool[anum_actions];
-    //TODO malloc instead
-    tried_actions = new BitMask; //(anum_actions);
-    //tried_actions->initBitMask();
-
-    //for( int i=0; i<num_actions; i++ ){
-    //tried_actions[i] = false;
-    //}   
+    tried_actions = new BitMask; 
 
     children = new MCTS_Node* [anum_actions];
     is_root = true;
@@ -25,9 +19,10 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     for( int i=0; i < num_players; i++ ){
         total_rewards[i] = 0;
     }
-
+    fully_expanded = false;
 }
 
+//for initializing non-root nodes
 MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     incCreated();
     is_root = false;
@@ -38,26 +33,12 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     num_players = aparent->num_players;
     num_actions = aparent->num_actions;
 
-    tried_actions = new BitMask; // (num_actions);
-    //tried_actions->initBitMask();
-    //tried_actions = new bool[num_actions];
-    //for( int i=0; i<num_actions; i++ ){
-    //tried_actions[i] = false;
-    //}   
+    tried_actions = new BitMask; 
 
     children = new MCTS_Node* [num_actions];
 
-    //TODO
-    //this compiles?!?!?!?
-    //parent->d_action_child[action] = this;
-    //parent->tried.insert(action);
-    //
-    //TODO: cant call state->action2ix but need to
-    //tried_actions[action] = true;
     parent->tried_actions->set(action, true);
     parent->children[action] = this;
-
-
 
     visit_count = 0;
 
@@ -66,7 +47,6 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
         total_rewards[i] = 0;
     }
 
-    //tentative?
     value = 0;
     fully_expanded = false;
 }
