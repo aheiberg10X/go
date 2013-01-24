@@ -1017,8 +1017,8 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
 
     int white_win = 0;
     int black_win = 0;
-    //setup rand generators on kernel
     if( USE_GPU ){
+        //setup rand generators on kernel
         curandState* devStates;
         cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) );
         setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
