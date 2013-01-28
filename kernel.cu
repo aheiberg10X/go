@@ -464,10 +464,8 @@ bool GoStateStruct::isSuicide( int action ){
 
     //floodfill each neighbor stopping if an adjacent EMPTY is found
     //If one of the groups has no liberties, the move is illegal
-    //(Not considering moves that make space by capturing opponent first
-    // these pieces should be removed beforehand)
+    //(Remember space making opponent captures have already been applied)
     bool left_with_no_liberties = false;
-    //set<int> marked;
     BitMask marked;
 
     char stop_array[1] = {EMPTY};
@@ -553,14 +551,13 @@ bool GoStateStruct::applyAction( int action,
 
     bool legal = true;
     freezeBoard();
-    //GoStateStruct* frozen = (GoStateStruct*) state->copy();
     //cout << "froxqne toString: " << frozen->toString() << endl;
 
     //The action parameter is really the index of the action to be taken
     //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
     int ix = action;
     char color = player;
-    action = ix2action( action, color);
+    action = ix2action( ix, color);
 
     if( ! isPass(action) ){
         //assert( state->action2color(action) == state->player );
@@ -583,14 +580,13 @@ bool GoStateStruct::applyAction( int action,
             int floodfill_len = 0;
             char stop_color_array[1] = {EMPTY};
             bool fill_completed =
-            floodFill( floodfill_array, &floodfill_len,
-                              filtered_array[onix],
-                              adjacency,
-                              filter_array, 1,
-                              stop_color_array, 1 );
+                floodFill( floodfill_array, &floodfill_len,
+                           filtered_array[onix],
+                           adjacency,
+                           filter_array, 1,
+                           stop_color_array, 1 );
             if( fill_completed ){
-                setBoard(
-                          floodfill_array,
+                setBoard( floodfill_array,
                           floodfill_len, 
                           EMPTY );
             }
