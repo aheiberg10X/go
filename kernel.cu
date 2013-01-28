@@ -64,6 +64,7 @@ GoStateStruct::GoStateStruct(){
         past_players[i] = OFFBOARD;
     }
 }
+
 /*
 GoStateStruct::GoStateStruct( void** pointers ){
     action = *((int*) pointers[0]);
@@ -1113,7 +1114,6 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             GoStateStruct* linear = (GoStateStruct*) gss->copy();
             BitMask to_exclude;
             int count = 0;
-            int rewards[2];
             while( count < MAX_MOVES && !linear->isTerminal() ){
                 int action = linear->randomAction( &to_exclude );
                 //bool is_legal = gss_local.applyAction( 48, true );
@@ -1121,6 +1121,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
                 //printf( "%s\n\n", linear.toString().c_str() );
                 count++;
             }
+            int rewards[2];
             linear->getRewards( rewards );
             if( rewards[0] == 1 ){
                 white_win++;
@@ -1128,8 +1129,6 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             else if( rewards[1] == 1 ){
                 black_win++;
             }
-
-
         }
         int tb = clock();
         //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
