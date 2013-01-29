@@ -231,7 +231,8 @@ public :
     //deprecated, in kernel
     int randomAction( void* uncast_state, 
                       BitMask* to_exclude ){
-        return ((GoStateStruct*) uncast_state)->randomAction(to_exclude);
+        bool side_effects = false;
+        return ((GoStateStruct*) uncast_state)->randomAction(to_exclude, side_effects);
     }
     /* 
     int randomAction( void* uncast_state,

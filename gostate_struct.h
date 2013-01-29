@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "queue.h"
 #include "bitmask.h"
+#include "zobrist.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -19,15 +20,20 @@ using namespace std;
 
 struct GoStateStruct{
     char board[BOARDSIZE];
-    //storage space for current board when checking move legality
-    char frozen_board[BOARDSIZE];
-    int frozen_num_open;
+    ZobristHash* zh;
+    int zhash;
     int action;
     int num_open;
     char player;
 
-    char past_boards[PAST_STATE_SIZE]; 
-    char past_players[NUM_PAST_STATES];
+    //storage space for current board when checking move legality
+    char frozen_board[BOARDSIZE];
+    int frozen_num_open;
+    int frozen_zhash;
+
+    int past_zhashes[NUM_PAST_STATES];
+    /*char past_boards[PAST_STATE_SIZE]; */
+    /*char past_players[NUM_PAST_STATES];*/
     int past_actions[NUM_PAST_STATES];
 
     //scratch space for floodFill
@@ -48,8 +54,9 @@ struct GoStateStruct{
     Queue queue;
 
     GoStateStruct();
+    GoStateStruct( ZobristHash* zh);
     
-    int numElementsToCopy();
+    /*int numElementsToCopy();*/
 
     __device__ __host__
     void freezeBoard();
@@ -150,8 +157,8 @@ struct GoStateStruct{
     bool isDuplicatedByPastState();
 
     __device__ __host__
-    void advancePastStates( char* past_board,
-                            char past_player,
+    void advancePastStates( int past_zhash, //char* past_board,
+            /*char past_player,*/
                             int past_action );
 
     __device__ __host__ 
@@ -161,7 +168,10 @@ struct GoStateStruct{
     int randomAction( curandState* crs, int tid, BitMask* to_exclude );
 
     __host__ 
-    int randomAction( BitMask* to_exclude );
+    int randomAction( BitMask* to_exclude, bool side_effects );
+
+    __host__ __device__
+    int randomActionBase( BitMask* to_exclude, bool side_effects, int* empty_ixs);
 
     __device__ __host__
     bool isTerminal();
@@ -172,3 +182,81 @@ struct GoStateStruct{
 };
 
 #endif
+
+
+/*
+void GoStateStruct::cudaAllocateAndCopy( void** pointers ){
+    int* dev_action;
+    int* dev_num_open;
+    char* dev_board;
+    char* dev_player;
+    char* dev_past_boards;
+    char* dev_past_players;
+    int* dev_past_actions;
+    char* dev_frozen_board;
+    int* dev_frozen_num_open;
+
+    cudaMalloc( (void**)&dev_action, sizeof(int) );
+    cudaMemcpy( dev_action, &(action), sizeof(int), cudaMemcpyHostToDevice );
+    pointers[0] = (void*) dev_action;
+
+    cudaMalloc( (void**)&dev_num_open, sizeof(int) );
+    cudaMemcpy( dev_num_open, &(num_open), sizeof(int), cudaMemcpyHostToDevice );
+    pointers[1] = (void*) dev_num_open;
+
+    cudaMalloc( (void**)&dev_board, BOARDSIZE*sizeof(char) );
+    cudaMemcpy( dev_board, board, BOARDSIZE*sizeof(char), cudaMemcpyHostToDevice );
+    pointers[2] = (void*) dev_board;
+
+    cudaMalloc( (void**)&dev_player, sizeof(char) );
+    cudaMemcpy( dev_player, &(player), sizeof(char), cudaMemcpyHostToDevice );
+    pointers[3] = (void*) dev_player;
+
+    cudaMalloc( (void**)&dev_past_boards, sizeof(char)*PAST_STATE_SIZE );
+    cudaMemcpy( dev_past_boards, past_boards, PAST_STATE_SIZE*sizeof(char), cudaMemcpyHostToDevice );
+    pointers[4] = (void*) dev_past_boards;
+
+    cudaMalloc( (void**)&dev_past_players, sizeof(int)*NUM_PAST_STATES );
+    cudaMemcpy( dev_past_players, past_players, sizeof(int)*NUM_PAST_STATES, cudaMemcpyHostToDevice );
+    pointers[5] = (void*) dev_past_players;
+    
+    cudaMalloc( (void**)&dev_past_actions, sizeof(int)*NUM_PAST_STATES );
+    cudaMemcpy( dev_past_actions, past_actions, sizeof(int)*NUM_PAST_STATES, cudaMemcpyHostToDevice );
+    pointers[6] = (void*) dev_past_actions;
+    
+    cudaMalloc( (void**)&dev_frozen_board, sizeof(char)*BOARDSIZE );
+    cudaMemcpy( dev_frozen_board, frozen_board, BOARDSIZE*sizeof(char), cudaMemcpyHostToDevice );
+    pointers[7] = (void*) dev_frozen_board;
+    
+    cudaMalloc( (void**)&dev_frozen_num_open, sizeof(int) );
+    cudaMemcpy( dev_frozen_num_open, &frozen_num_open, sizeof(int), cudaMemcpyHostToDevice );
+    pointers[8] = (void*) dev_frozen_num_open;
+}
+*/
+/*
+GoStateStruct::GoStateStruct( void** pointers ){
+    action = *((int*) pointers[0]);
+    num_open = *((int*) pointers[1]);
+    for( int i=0; i<BOARDSIZE; i++ ){
+        board[i] = ((char*) pointers[2])[i];
+    }
+    player = *((char*) pointers[3]);
+    for( int i=0; i<PAST_STATE_SIZE; i++ ){
+        past_boards[i] = ((char*) pointers[4])[i];
+    }
+    for( int i=0; i<NUM_PAST_STATES; i++ ){
+        past_players[i] = ((char*) pointers[5])[i];
+    }
+    for( int i=0; i<NUM_PAST_STATES; i++ ){
+        past_actions[i] = ((int*) pointers[6])[i];
+    }
+    for( int i=0; i<BOARDSIZE; i++ ){
+        frozen_board[i] = ((char*) pointers[7])[i];
+    }
+    frozen_num_open = *((int*) pointers[8]);
+}*/
+/*
+int GoStateStruct::numElementsToCopy(){
+    return 9;
+}
+*/

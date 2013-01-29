@@ -4,10 +4,10 @@
 #include <math.h>
 
 //Use the GPU?
-#define USE_GPU true 
+#define USE_GPU false
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 1000
+#define NUM_SIMULATIONS 10000
 
 //How many itertions of MCTS before best move selected?
 #define NUM_ITERATIONS 1000
@@ -17,7 +17,6 @@
 //GoStateStruct Constants
 //set these
 #define DIMENSION 9
-#define NUM_PAST_STATES 2 
 
 //Leave these alone
 #define BIGDIM (DIMENSION+2)
@@ -26,6 +25,10 @@
 #define ADJACENCY 8
 #define ADJ_PLUS_ONE (ADJACENCY+1)
 #define MAX_MOVES BOARDSIZE
+
+//past board state constants
+#define NUM_ZOBRIST_VALUES (BOARDSIZE*2)
+#define NUM_PAST_STATES 20 
 
 //bitmask constants
 #define MOD 32

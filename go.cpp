@@ -4,6 +4,10 @@
 #include "mcts.h"
 #include "queue.h"
 #include "bitmask.h"
+#include "zobrist.h"
+
+//just for direct timing/testing launchSimulationKernel
+#include "kernel.h"
 
 #include <assert.h>
 #include <iostream>
@@ -12,15 +16,48 @@
 using namespace std;
 
 int main(){
+    srand(time(0));
     //cout << sizeof(COLOR) << endl;
     //cout << sizeof(int) << endl;
     //cout << sizeof(char) << endl;
     //cout << sizeof(bool) << endl;
-    //cout << sizeof(GoStateStruct) << endl;
+    cout << sizeof(GoStateStruct) << endl;
     //cout << PAST_STATE_SIZE << endl;
+    
 
-    srand(time(NULL));
+    //zobrist testing
+    ZobristHash* zh = new ZobristHash;
 
+
+    //playout simulation performance timing
+    if( true ){
+        GoStateStruct* gss = new GoStateStruct(zh);
+        int rewards[2];
+        launchSimulationKernel( gss, rewards );
+    }
+    
+
+    //play a full MCTS game
+    if( false ){
+        Domain* domain = (Domain*) new GoDomain();
+        GoStateStruct* gs = new GoStateStruct;
+        void* uncast_state = (void*) gs;
+        MCTS mcts(domain);
+
+        while( !domain->isTerminal( uncast_state ) ){
+            int ta = clock();
+            int best_action = mcts.search( uncast_state );
+            int tb = clock();
+            cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
+            cout << "Best Action: " << best_action << endl;
+            domain->applyAction( uncast_state, best_action, true );
+            cout << "Applying action: " << best_action << endl;
+            cout << "Resulting state: " << ((GoStateStruct* ) uncast_state)->toString(  ) << endl;
+            cout << "hit any key..." << endl;
+            cin.ignore();
+        }
+        
+    }
     /*
     GoStateStruct state;
     int bi[9] = {1,1,2,2,2,2,3,3,4};
@@ -40,27 +77,7 @@ int main(){
     cout << action << endl;
     */
 
-    if( true ){
-        Domain* domain = (Domain*) new GoDomain();
-        GoStateStruct* gs = new GoStateStruct;
-        void* uncast_state = (void*) gs;
-        MCTS mcts(domain);
-
-        while( !domain->isTerminal( uncast_state ) ){
-            int ta = clock();
-            int best_action = mcts.search( uncast_state );
-            int tb = clock();
-            cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
-            cout << "Best Action: " << best_action << endl;
-            domain->applyAction( uncast_state, best_action, true );
-            cout << "Applying action: " << best_action << endl;
-            cout << "Resulting state: " << ((GoStateStruct* ) uncast_state)->toString(  ) << endl;
-            cout << "hit any key..." << endl;
-            
-            cin.ignore();
-        }
-        
-    }
+   
     
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
@@ -98,15 +115,7 @@ int main(){
         //cout << state->boardToString( &(state->past_boards[PAST_STATE_SIZE-BOARDSIZE]) ) << endl;
 
         cout << "duplicated: " << state->isDuplicatedByPastState() << endl;
-        GoDomain gd;
-        BitMask bm;
-        while( !gd.isTerminal( (void*) state ) ){
-            cout << state->toString() << endl;
-            int action = gd.randomAction( (void*) state, &bm );
-            bool legal = gd.applyAction( (void*) state, action, true );
-        }
-        cout << state->toString() << endl;
-         
+          
     }
     */
 
