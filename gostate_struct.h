@@ -20,7 +20,7 @@ using namespace std;
 
 struct GoStateStruct{
     char board[BOARDSIZE];
-    ZobristHash* zh;
+    ZobristHash* zhasher;
     int zhash;
     int action;
     int num_open;
@@ -165,10 +165,13 @@ struct GoStateStruct{
     bool applyAction( int action, bool side_effects );
 
     __device__ 
-    int randomAction( curandState* crs, int tid, BitMask* to_exclude );
+    int randomAction( curandState* crs, int tid, BitMask* to_exclude, bool side_effects );
 
     __host__ 
     int randomAction( BitMask* to_exclude, bool side_effects );
+
+    __host__
+    int smarterRandomAction( BitMask* to_exclude, bool side_effects );
 
     __host__ __device__
     int randomActionBase( BitMask* to_exclude, bool side_effects, int* empty_ixs);

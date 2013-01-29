@@ -41,8 +41,8 @@ __device__ float generate( curandState* globalState, int ind ){
 GoStateStruct::GoStateStruct(){
 }
 
-GoStateStruct::GoStateStruct(ZobristHash* azh){
-    zh = azh;
+GoStateStruct::GoStateStruct(ZobristHash* zh){
+    zhasher = zh;
     player = BLACK;
     action = 12345678;
     zhash = 0;
@@ -95,7 +95,7 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     target->action = action;
     target->num_open = num_open;
     target->frozen_num_open = frozen_num_open;
-    target->zh = zh;
+    target->zhasher = zhasher;
     for( int i=0; i<BOARDSIZE; i++ ){
         target->board[i] = board[i];
         target->frozen_board[i] = frozen_board[i];
@@ -261,12 +261,12 @@ void GoStateStruct::setBoard( int ix, char color ){
 
     char incumbant_color = board[ix]; 
     if( color == EMPTY ){ 
-        zhash = zh->updateHash( zhash, ix, incumbant_color );
+        zhash = zhasher->updateHash( zhash, ix, incumbant_color );
         num_open++; 
     } 
     else{ 
         //assert( board[ix] == EMPTY ); 
-        zhash = zh->updateHash( zhash, ix, color );
+        zhash = zhasher->updateHash( zhash, ix, color );
         num_open--; 
     } 
     board[ix] = color; 
@@ -594,10 +594,11 @@ bool GoStateStruct::applyAction( int action,
 __device__
 int GoStateStruct::randomAction( curandState* globalState,
                   int tid,
-                  BitMask* to_exclude ){
+                  BitMask* to_exclude,
+                  bool side_effects ){
     //cout << "inside randomAction" << endl;
     //GoStateStruct* state = (GoStateStruct*) uncast_state;
-    int size = num_open; //state->open_positions.size();
+    //int size = num_open; //state->open_positions.size();
     int empty_ixs[ BOARDSIZE /*size*/  ];
     //cout << "size: " << size << endl;
 
@@ -620,7 +621,10 @@ int GoStateStruct::randomAction( curandState* globalState,
         }
     }
     //cout << "after shuffled" << endl;
+    //
+    return randomActionBase( to_exclude, side_effects, empty_ixs );
 
+    /*
     //try each one to see if legal
     bool legal_moves_available = false;
     int candidate;
@@ -640,7 +644,7 @@ int GoStateStruct::randomAction( curandState* globalState,
     }
     else {
         return PASS;
-    }
+    }*/
 }
 
 __host__ __device__
@@ -670,6 +674,58 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
     }
 
 }
+
+//pick a random position, and iterate until the first empty found
+//if legal, 
+//  if non-excluded : apply/return
+//  else : note that there is a legal move left
+//else, keep iterating
+//  this time check exclusion before legality
+//if you reach original start, stop
+//  if legal move was excluded : return EXLCUDED
+//  else : return pass
+//
+//  ah shit this isn't actually random, consider:
+//  xxxxxxxxxxxxxxxx__xxxxxxxxxxxxxxx
+//  the left empty spot will be chosen almost all the time
+//  TODO: take the trick with the legal_but_excluded and apply to truly random version
+int GoStateStruct::smarterRandomAction( BitMask* to_exclude,
+                                        bool side_effects ){
+   
+    bool legal_but_excluded_move_available = false;
+    int ix = rand() % BOARDSIZE;
+    cout << "random ix: " << ix << endl;
+    for( int iter=0; iter<BOARDSIZE; iter++ ){
+        if( board[ix] == EMPTY ){
+            bool ix_is_excluded = to_exclude->get(ix);
+            if( legal_but_excluded_move_available ){
+                if( ! ix_is_excluded ){
+                    bool is_legal = applyAction( ix, side_effects );
+                    if( is_legal ){
+                        return ix;
+                    }
+                }
+            }
+            else{
+                bool is_legal = applyAction( ix, side_effects );
+                if( is_legal ){
+                    if( ix_is_excluded ){
+                        legal_but_excluded_move_available = true;
+                    }
+                    else{
+                        return ix;
+                    }
+                }
+            }
+        }
+        //ring increment
+        if( ++ix >= BOARDSIZE ){ ix = 0; }
+    }
+    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
+    else { return PASS; }
+}
+
+                                        
 
 __host__
 int GoStateStruct::randomAction( BitMask* to_exclude, 
@@ -896,6 +952,12 @@ ZobristHash::ZobristHash(){
     }
 }
 
+void ZobristHash::copyInto( ZobristHash* target ){
+    for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
+        target->values[ix] = values[ix];
+    }
+}
+
 int ZobristHash::getValue( char color, int ix ){
     int i;
     if(      color == BLACK ){ i = ix; }
@@ -969,19 +1031,25 @@ __global__ void reconstruct( void** pointers, int* results ){
 */
 
 __global__ void leafSim( GoStateStruct* gss,
+                         ZobristHash* zh,
                          curandState* globalState, 
                          int* winners,
                          int* iterations ){
     int tid = blockIdx.x;
 
     __shared__ GoStateStruct gss_local;
+    __shared__ ZobristHash zhasher_local;
     //TODO: make ZobristHash Local as well,  arg waste more space
+    //do if tid == 0 here, race conditions?
     gss->copyInto( &gss_local );
+    zh->copyInto( &zhasher_local );
+    gss_local.zhasher = &zhasher_local;
+
     BitMask to_exclude;
     int count = 0;
     while( count < MAX_MOVES && !gss_local.isTerminal() ){
-        int action = gss_local.randomAction( globalState, tid, &to_exclude );
-        bool is_legal = gss_local.applyAction( action, true );
+        int action = gss_local.randomAction( globalState, tid, &to_exclude, true );
+        //bool is_legal = gss_local.applyAction( action, true );
         count++;
     }
 
@@ -1002,6 +1070,10 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         GoStateStruct* dev_gss;
         cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
         cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
+
+        ZobristHash* dev_zh;
+        cudaMalloc( (void**) &dev_zh, sizeof(ZobristHash) );
+        cudaMemcpy( dev_zh, gss->zhasher, sizeof(ZobristHash), cudaMemcpyHostToDevice );
         
         int ta = clock();
         //printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
@@ -1024,6 +1096,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
 
         leafSim<<<NUM_SIMULATIONS, 1>>>(dev_gss, 
+                                    dev_zh,                                    
                                    devStates, 
                                    dev_winners,
                                    dev_iterations );
@@ -1054,10 +1127,10 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             else if( winners[i*2+1] == 1 ){
                 black_win++;
             }
-            //printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
-            //printf( "Took: %d steps\n\n", iterations[i] );
-            //printf("%d - %d\n", winners[i*2], winners[i*2+1] );
-            //printf("%d\n\n", iterations[i] );
+            printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
+            printf( "Took: %d steps\n\n", iterations[i] );
+            printf("%d - %d\n", winners[i*2], winners[i*2+1] );
+            printf("%d\n\n", iterations[i] );
             iteration_counts[iterations[i]]++;
 
         }
@@ -1073,13 +1146,14 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         }
         */
         cudaFree( dev_gss );
+        cudaFree( dev_zh );
         cudaFree( dev_winners );
         cudaFree( dev_iterations );
         cudaFree( devStates );
 
         int tb = clock();
 
-        //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+        printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
     
     }
     else{
