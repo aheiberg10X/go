@@ -27,17 +27,20 @@ int main(){
 
     //zobrist testing
     ZobristHash* zh = new ZobristHash;
-
+    zh->ctor();
 
     //playout simulation performance timing
     if( true ){
-        GoStateStruct* gss = new GoStateStruct(zh);
+        GoStateStruct* gss = new GoStateStruct;
+        gss->ctor(zh);
+        gss->zhash = 42;
         int rewards[2];
         launchSimulationKernel( gss, rewards );
     }
     
 
     //play a full MCTS game
+    //needs rework with zobrist hashes and whatnot
     if( false ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;

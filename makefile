@@ -1,4 +1,4 @@
-CFLAGS = #-pg
+CFLAGS = #--cubin #--ptxas-options=-v #-pg
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR = nvcc 

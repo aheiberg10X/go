@@ -38,10 +38,7 @@ __device__ float generate( curandState* globalState, int ind ){
 //////////////////////////////////////////////////////////////////////////////
 //                     GoStructState.cu
 /////////////////////////////////////////////////////////////////////////////
-GoStateStruct::GoStateStruct(){
-}
-
-GoStateStruct::GoStateStruct(ZobristHash* zh){
+void GoStateStruct::ctor(ZobristHash* zh){
     zhasher = zh;
     player = BLACK;
     action = 12345678;
@@ -91,6 +88,7 @@ void GoStateStruct::thawBoard(){
 }
 
 void GoStateStruct::copyInto( GoStateStruct* target ){
+    target->zhash = zhash;
     target->player = player;
     target->action = action;
     target->num_open = num_open;
@@ -593,7 +591,7 @@ bool GoStateStruct::applyAction( int action,
 //return an unsigned action, i.e an ix in the board
 __device__
 int GoStateStruct::randomAction( curandState* globalState,
-                  int tid,
+                  int tid,  //tid really blockId, we are changing code
                   BitMask* to_exclude,
                   bool side_effects ){
     //cout << "inside randomAction" << endl;
@@ -945,12 +943,19 @@ bool Queue::isEmpty(){
 //             Zobrist
 ////////////////////////////////////////////////////////////////////////////
 
-ZobristHash::ZobristHash(){
+__host__
+void ZobristHash::ctor(){
     //B,W,E
     for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
         values[ix] = rand();
     }
 }
+
+//__device__
+//void ZobristHash::ctor( curandState* states, int block_id ){
+//for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
+//values[ix] = generate( states, block_id ) * INT_MAX
+//}
 
 void ZobristHash::copyInto( ZobristHash* target ){
     for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
@@ -968,8 +973,7 @@ int ZobristHash::getValue( char color, int ix ){
 //empty is the default.
 //things go B/W->empty, or B/W->empty
 int ZobristHash::updateHash( int hash, int position, char color ){
-    hash ^= getValue( color, position );
-    return hash;
+    return hash ^ getValue( color, position );
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1035,12 +1039,58 @@ __global__ void leafSim( GoStateStruct* gss,
                          curandState* globalState, 
                          int* winners,
                          int* iterations ){
-    int tid = blockIdx.x;
+    int tid = blockIdx.x + threadIdx.x;
 
+    //TODO: still giving __shared__ non-empty constructor warning
+    //because of mem variables like BitMask.  Fix eventually
     __shared__ GoStateStruct gss_local;
     __shared__ ZobristHash zhasher_local;
+    //__shared__ BitMask legal;
+    //__shared__ BitMask illegal;
+    __syncthreads();
+    if( tid == 0 ){
+        //TODO modify BitMask to fit this paradig,
+        gss->copyInto( &gss_local ); 
+        zh->copyInto( &zhasher_local );
+        gss_local.zhasher = &zhasher_local;
+    }
+    __syncthreads();
+
+
+    //TODO all this is parallel code for a randomActino impl, why did i put here
+    char color = gss_local.player;
+    int ix = tid;
+    while( ix < BOARDSIZE ){
+        int legal = testLegality( ix, color );
+        //definitely not legal
+        if( legal == 0 ){
+        }
+        //definitely legal
+        else if( legal == 1 ){
+        }
+        //further checking needed (sequentially by one thread)
+        else{
+        }
+        ix += NUM_THREADS;
+    }
+
+    __syncthreads();
+
+    //now let thread 0 go through the ambiguous ones as before
+    if( !legal.get(ix) && !illegal.get(ix) ){
+        
+
+    winners[tid] = tid+42;
+    if( tid % 2 == 0 ){
+        int num = zhasher_local.updateHash( gss_local.zhash, tid, BLACK );
+        iterations[tid/2] = num; 
+    }
+
+    __syncthreads();
+
     //TODO: make ZobristHash Local as well,  arg waste more space
     //do if tid == 0 here, race conditions?
+    /*
     gss->copyInto( &gss_local );
     zh->copyInto( &zhasher_local );
     gss_local.zhasher = &zhasher_local;
@@ -1055,6 +1105,7 @@ __global__ void leafSim( GoStateStruct* gss,
 
     iterations[tid] = count;
     gss_local.getRewards( &(winners[tid*2]) );
+    */
 
 }
 
@@ -1071,6 +1122,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
         cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
 
+        printf( "hash test: %d\n", gss->zhasher->updateHash( gss->zhash, 1, BLACK ) );
         ZobristHash* dev_zh;
         cudaMalloc( (void**) &dev_zh, sizeof(ZobristHash) );
         cudaMemcpy( dev_zh, gss->zhasher, sizeof(ZobristHash), cudaMemcpyHostToDevice );
@@ -1095,8 +1147,9 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         //this is the default, setting it to PreferL1 slowed down 3x
         cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
 
-        leafSim<<<NUM_SIMULATIONS, 1>>>(dev_gss, 
-                                    dev_zh,                                    
+        leafSim<<<NUM_SIMULATIONS, NUM_THREADS>>>
+                                  (dev_gss, 
+                                   dev_zh,                                    
                                    devStates, 
                                    dev_winners,
                                    dev_iterations );
@@ -1131,7 +1184,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             printf( "Took: %d steps\n\n", iterations[i] );
             printf("%d - %d\n", winners[i*2], winners[i*2+1] );
             printf("%d\n\n", iterations[i] );
-            iteration_counts[iterations[i]]++;
+            //iteration_counts[iterations[i]]++;
 
         }
 
@@ -1215,7 +1268,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     //printf( "dev white win count: %d\n", white_win_dev );
     //printf( "host white win count: %d\n", white_win_host );
     
-    assert( white_win+black_win == NUM_SIMULATIONS );
+    //assert( white_win+black_win == NUM_SIMULATIONS );
     rewards[0] = white_win;
     rewards[1] = black_win;
     

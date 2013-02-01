@@ -7,7 +7,8 @@
 #define USE_GPU true
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 100000
+#define NUM_SIMULATIONS 2
+#define NUM_THREADS 4 
 
 //How many itertions of MCTS before best move selected?
 #define NUM_ITERATIONS 1000

@@ -53,11 +53,9 @@ struct GoStateStruct{
     BitMask on_queue;
     Queue queue;
 
-    GoStateStruct();
-    GoStateStruct( ZobristHash* zh);
+    __host__
+    void ctor( ZobristHash* zh);
     
-    /*int numElementsToCopy();*/
-
     __device__ __host__
     void freezeBoard();
 
@@ -162,6 +160,9 @@ struct GoStateStruct{
                             int past_action );
 
     __device__ __host__ 
+    bool isNaivelyLegal( int ix, char COLOR );
+
+    _device__ __host__ 
     bool applyAction( int action, bool side_effects );
 
     __device__ 
