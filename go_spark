@@ -1,0 +1,115 @@
+1/31/13
+
+Good ref here: http://developer.download.nvidia.com/CUDA/training/NVIDIA_GPU_Computing_Webinars_CUDA_Memory_Optimization.pdf
+
+Why wait for GPU to finish playouts before continuing to explore tree?  Better would be asynch, so the CPU keeps doing selection moves.  When the GPU is done
+computing the playouts from the previous one, have backprop handler execute?  Not algorithmically precise, but perhaps not a big deal.
+
+cudaMallocHost() ?? pinned host memory (what does this imply, exactly?)
+
+test performance of global vs shared somehow
+
+
+Started working on integrating threads, can now have multiple threads in block without seg fault
+	- still need work on constructors to make warnings go away, this is low priority though
+
+Have the following ideas for speedup:
+
+randomAction : 
+	each thread checks an intersection for simple illegality
+		-not occupied, not surrounded by kin
+		- mark if def legal as well
+	randomly shuffle the indices into two groups, def legal and unsure
+	while not found legal
+		random()
+		if rand num falls in def legal, return a member from this group
+		else start testing someone from unsure group (maintain walker ix to iterate in order)
+
+applyAction
+	have switch to avoid simple eye checking if implicitly already done in randomAction
+	have each thread check if has complaining intersection:
+		abuts an enemy
+		has no liberties
+		didn't complain last time
+	for each new complainer:
+		floodFill to check libs
+		if no libs:
+			if same color : illegal, return false
+			else : capture and keep going (do anything to old_complainer bitmask here?)
+
+	REALLY NEED TO ANALYZE THIS ALGO MORE CAREFULLY, ESP with respect to complainers and captures
+
+
+
+=========================================================================================================
+
+1/30/13
+
+Talked to Michael Arnold about GPU. He wants to hava a more complete characterization of them, especially regarding memory access (global vs shared)
+So I need to cobble together some sources
+
+Also we need to drill down the algorithms that are relevant here and figure out what can go in parallel.  Perhaps send him the randomAction, applyAction code and formalize the idea of the parallel legal-move checking.
+
+=========================================================================================================
+
+1/29/13
+
+--ptxas-options=-v : reports shared memory per block
+
+
+========================================================================================================
+
+1/28/13
+
+Will be meeting with Fred and guy to compare my impl to the one discussed here:
+http://article.gmane.org/gmane.games.devel.go/20027/match=gpu+go
+
+He got 47,000 playouts per second!? wtf.  I am getting ~600.  Are we measuring different things
+or have I done something dumb?  The only real gains I can see are to use Zobrist hashing to compare past states.
+But surely this will not be enough....
+
+So made a few improvements:
+1) randomAction can be configured to auto-apply the first legal action it comes across
+	-whoops this conflicts with the exclusion set.  No matter, need to redo logic for speed-up anyway (see smarterRandomAction for deet, sadly sRA isn't truly random
+2) Zobrist Hashing for superko checking
+3) simplified rewards calculation to utilize the fact that only single eyes will be open empty when play concludes (by construction)
+
+This got almost a 2x speed up, still a longway off the 47x was looking for :)
+
+TODO: fix/optimize randomAction.  Consider storing open positions in a way that can be randomly sampled (mem loss prob not worth it, got a 8->7 sec when using smarter randomAction, and that is as good sampling a new data structure would be)
+
+Need to do more testing of GPU, not entirely sure it's all working correctly
+
+use deviceQuery for spec's for meeting
+
+use occupancy calculator for more numbers
+
+
+
+==================================================================================================
+
+1/27/13
+
+Making high level slides for meeting with that guy at Salk Fred mentioned
+
+TODO: in randomAction(), check for exclusion before doing legality test
+TODO: Zobrist hashes rather than storing the past boards explicitly, can improve Ko checking
+TODO: root parallelization
+
+
+===================================================================================================
+
+1/24/13
+
+new direction is to pursue root parallelization
+openmp vs boost::threads
+	- since will need very little (none) communication between MCTS trees, OpenMP should be easiest
+	- can email jack about OpenMP
+probably want to fork repo again and remove all CUDA/nvcc related stuff?
+
+Read up on RI learning, fred says I can prob skip chapters 1-3.  
+Want to work through DP, MC, then TD approaches
+
+perhaps will need to put some slides together on base code approach by next week
+
+
