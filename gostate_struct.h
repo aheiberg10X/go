@@ -26,6 +26,7 @@ struct GoStateStruct{
     int num_open;
     char player;
 
+
     //storage space for current board when checking move legality
     char frozen_board[BOARDSIZE];
     int frozen_num_open;
@@ -116,9 +117,16 @@ struct GoStateStruct{
 
     __device__ __host__
     void setBoard( int* ixs, int len, char color );
+    
+    __device__ __host__
+    void capture( BitMask* bm );
 
     __device__ __host__
     void neighborsOf( int* to_fill, int ix, int adjacency );
+
+    __device__ __host__ 
+    void neighborsOf2( int* to_fill, int* to_fill_len,
+                       int ix, int adjacency, char filter_color );
 
     __device__ __host__
     void filterByColor(  
@@ -141,6 +149,16 @@ struct GoStateStruct{
                     char* stop_color_array,
                     int stop_len );
 
+    __device__ __host__
+    bool floodFill2( 
+            /*int* to_fill,*/
+            /*int* to_fill_len,*/
+            BitMask* flooded, 
+                    int epicenter_ix,
+                    int adjacency,
+                    char flood_color,
+                    char stop_color );
+
 
     __device__ __host__
     bool isSuicide( int action );
@@ -159,10 +177,10 @@ struct GoStateStruct{
             /*char past_player,*/
                             int past_action );
 
-    __device__ __host__ 
-    bool isNaivelyLegal( int ix, char COLOR );
+    /*__device__ __host__ */
+    /*bool isNaivelyLegal( int ix, char COLOR );*/
 
-    _device__ __host__ 
+    __device__ __host__ 
     bool applyAction( int action, bool side_effects );
 
     __device__ 

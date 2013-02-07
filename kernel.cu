@@ -189,6 +189,7 @@ string GoStateStruct::toString(){
     out += boardToString( board );
     
     ss << "Action : " << action << endl;
+    ss << "Num open: " << num_open << endl;
     out += ss.str();
     return out;
 }
@@ -277,6 +278,46 @@ void GoStateStruct::setBoard( int* ixs, int len, char color ){
     }
 }    
 
+void GoStateStruct::capture( BitMask* bm ){
+    int nSet = 0;
+    int ix = 0;
+    while( nSet < bm->count ){
+        if( bm->get(ix) ){ 
+            setBoard( ix, EMPTY );
+            nSet++;
+        }
+        ix++;
+    }
+}
+
+void GoStateStruct::neighborsOf2( int* to_fill, int* to_fill_len,
+                                  int ix, int adjacency,
+                                  char filter_color ){
+    if( board[ix] == OFFBOARD ){ return; }
+    int fillix = 0;
+    if( adjacency == 4 ){
+        //N
+        if( board[ix-BIGDIM] == filter_color  ){ 
+            to_fill[fillix++] = ix-BIGDIM;
+        }
+        //S
+        if( board[ix+BIGDIM] == filter_color ){
+            to_fill[fillix++] = ix+BIGDIM;
+        }
+        //E
+        if( board[ix+1] == filter_color ){
+            to_fill[fillix++] = ix+1;
+        }
+        //W
+        if( board[ix-1] == filter_color ){
+            to_fill[fillix++] = ix-1;
+        }
+    }
+    else{
+    }
+    *to_fill_len = fillix;
+}
+
 void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
     //assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
@@ -292,21 +333,76 @@ void GoStateStruct::filterByColor(
                     char* color_array,
                     int filter_len ){
 
-    *to_fill_len = 0;
-    //int fillix = 0;  
+    //*to_fill_len = 0;
+    int fillix = 0;  
     char ncolor;       
     for(int naix=0; naix<adjacency; naix++){
         int nix = neighbs[naix];
         ncolor = board[nix];
-        //cout << "nix: " << nix << " ncolor: " << ncolor << endl;
         for( int caix=0; caix<filter_len; caix++ ){
             if( ncolor == color_array[caix] ){ 
-                to_fill[(*to_fill_len)] = nix;
-                *to_fill_len = *to_fill_len + 1;
+                to_fill[ fillix++ ] = nix;
+                //to_fill[(*to_fill_len)] = nix;
+                //*to_fill_len = *to_fill_len + 1;
             }
         }
     }
+    *to_fill_len = fillix;
 }
+
+bool GoStateStruct::floodFill2(  
+                BitMask* marked, 
+                int epicenter_ix,
+                int adjacency,
+                char flood_color,
+                char stop_color ){
+
+    on_queue.clear(); //initBitMask();
+    queue.clear(); //initQueue();
+    //marked.clear();
+
+    queue.push( epicenter_ix );
+    
+    //int neighbs[adjacency];
+    bool stop_color_not_encountered = true;
+
+    while( !queue.isEmpty() ){
+        int ix = queue.pop();
+        marked->set( ix, true);
+ 
+        //find if there are neighbors that cause flood fill to stop
+        int filtered_len = 0;
+
+        neighborsOf2( internal_filtered_array,
+                      &filtered_len,
+                      ix, adjacency, stop_color );
+
+        bool stop_color_is_in_neighbs = filtered_len > 0;
+        if( stop_color_is_in_neighbs ){
+            stop_color_not_encountered = false;
+            break;
+        }
+        else {
+            neighborsOf2( internal_filtered_array,
+                          &filtered_len,
+                          ix, adjacency, flood_color );
+            
+            //see if connector neighbors are already in marked
+            //if not, add them
+            //assert( filtered_len <= 4 );
+            for( int faix=0; faix < filtered_len; faix++ ){
+                int ix = internal_filtered_array[faix];
+                if( !marked->get( ix) && !on_queue.get( ix) ){
+                    queue.push(ix);
+                    on_queue.set( ix,true);
+                }
+            }
+        }
+    }
+
+    return stop_color_not_encountered;
+}
+
 
 bool GoStateStruct::floodFill(  
                 int* to_fill,
@@ -490,10 +586,10 @@ void GoStateStruct::advancePastStates( int past_zhash, //char* past_board,
 bool GoStateStruct::applyAction( int action,
                                  bool side_effects ){
 
-    //cout << "inside applyAction" << endl;
+
+    //cout << "ix: " <<  action << endl;
     //assert( action >= 0 );
     //cout << state->toString() << endl;
-    //cout << "ix: " << action << " state->player: " << state->player << endl;
 
     bool legal = true;
     freezeBoard();
@@ -511,35 +607,61 @@ bool GoStateStruct::applyAction( int action,
 
         //resolve captures
         int adjacency = 4;
-        //int neighbs[adjacency];
-        neighborsOf( neighbor_array, ix, adjacency );
+        //neighborsOf( neighbor_array, ix, adjacency );
         char opp_color = flipColor(color); 
 
-        //int opp_neighbs[adjacency];
         int opp_len = 0;
-        char filter_array[1] = {opp_color};
-        filterByColor( filtered_array, &opp_len,
-                       neighbor_array, adjacency,
-                       filter_array, 1 );
+        //char filter_array[1] = {opp_color};
+        //filterByColor( filtered_array, &opp_len,
+        //neighbor_array, adjacency,
+        //filter_array, 1 );
 
+        neighborsOf2( filtered_array, &opp_len, 
+        ix, adjacency, opp_color );
+
+        //if( opp_len == 0 ){
+        //cout << "no FF necessary" << endl;
+        //}
+        //else{
+        //cout << "yes FF" << endl;
+        //}
+
+        //int a = clock();
         for( int onix=0; onix < opp_len; onix++ ){
-            int floodfill_len = 0;
-            char stop_color_array[1] = {EMPTY};
+            //int floodfill_len = 0;
+            //char stop_color_array[1] = {EMPTY};
+            marked.clear();
             bool fill_completed =
-                floodFill( floodfill_array, &floodfill_len,
-                           filtered_array[onix],
-                           adjacency,
-                           filter_array, 1,
-                           stop_color_array, 1 );
+
+                //floodFill( floodfill_array, &floodfill_len,
+                //filtered_array[onix],
+                //adjacency,
+                //filter_array, 1,
+                //stop_color_array, 1 );
+
+                floodFill2( 
+                &marked, 
+                filtered_array[onix],
+                adjacency,
+                opp_color,
+                EMPTY );
+
             if( fill_completed ){
-                setBoard( floodfill_array,
-                          floodfill_len, 
-                          EMPTY );
+                capture( &marked );
+                //setBoard( floodfill_array, floodfill_len, EMPTY );
             }
         }
+        //int b = clock();
+        //if( opp_len > 0 ){
+        //cout << "FF time: " << (b-a) << endl;
+        //}
+
+        //a = clock();
         if( isSuicide( action ) ){
             legal = false;
         }
+        //b = clock();
+        //cout << "suicide check time: " << (b-a) << endl;
         //cout << "checked for suicide" << endl;
 
         //TODO
@@ -558,7 +680,7 @@ bool GoStateStruct::applyAction( int action,
         }*/
     }
     
-    //cout << "testing legality" << endl;
+    cout << "legal" << legal << endl;
     if( legal ){
         if( side_effects ){
             //cout << "legal and side effects" <<endl;
@@ -575,18 +697,10 @@ bool GoStateStruct::applyAction( int action,
         return true;
     }
     else{
-        if( side_effects ){
-            //cout << "action: " << action << endl;
-            //assert(false);
-        }
-        else{
-            thawBoard();
-        }
+        thawBoard();
         return false;
     }  
 }
-
-
 
 //return an unsigned action, i.e an ix in the board
 __device__
@@ -651,25 +765,37 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
                                      int* empty_ixs
                                     ){
     //try each one to see if legal
-    bool legal_moves_available = false;
-    int candidate;
+    //bool legal_moves_available = false;
+    bool legal_but_excluded_move_available = false;
     for( int j=0; j<num_open; j++ ){
-        candidate = empty_ixs[j];
-        bool is_legal = applyAction( candidate, side_effects );
-        if( is_legal ){
-            legal_moves_available = true;
-            if( !to_exclude->get( candidate ) ){
-                return candidate;
+        int ix = empty_ixs[j];
+        cout << "candidatae: "<< ix << endl;
+        bool ix_is_excluded = to_exclude->get(ix);
+        if( legal_but_excluded_move_available ){
+            if( ! ix_is_excluded ){
+                bool is_legal = applyAction( ix, side_effects );
+                if( is_legal ){
+                    cout << "num tried until legal1: " << j << endl;
+                    return ix;
+                }
+            }
+        }
+        else{
+            bool is_legal = applyAction( ix, side_effects );
+            if( is_legal ){
+                if( ix_is_excluded ){
+                    legal_but_excluded_move_available = true;
+                }
+                else{
+                    cout << "num tried until legal: " << j << endl;
+                    return ix;
+                }
             }
         }
     }
-
-    if( legal_moves_available ){ //but all were excluded...
-        return EXCLUDED_ACTION;
-    }
-    else {
-        return PASS;
-    }
+    
+    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
+    else { return PASS; }
 
 }
 
@@ -733,6 +859,8 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     int size = num_open; //state->open_positions.size();
     int empty_ixs[ /*BOARDSIZE*/ size  ];
     //cout << "size: " << size << endl;
+    //
+    int nEmpty = 0;
 
     int i = 0;
     int j;
@@ -740,6 +868,7 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     for( int ix=0; ix<BOARDSIZE; ix++ ){
         //cout << "random shuffle i: " << i << endl;
         if( board[ix] == EMPTY ){
+            nEmpty++;
             if( i == 0 ){
                 empty_ixs[0] = ix;
             }
@@ -751,6 +880,7 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
             i++;
         }
     }
+    assert( nEmpty == num_open );
     return randomActionBase( to_exclude, side_effects, empty_ixs );
 }
 
@@ -867,7 +997,7 @@ bool GoStateStruct::isTerminal(){
 /////////////////////////////////////////////////////////////////////////////
 //                     BitMask.cu
 /////////////////////////////////////////////////////////////////////////////
-
+// OMFG just just use a bool[] ?
 BitMask::BitMask(){
     clear();
 }
@@ -876,6 +1006,7 @@ void BitMask::clear(){
     for( int i=0; i<BITMASK_SIZE; i++ ){
         masks[i] = 0;
     }
+    count = 0;
 }
 
 void BitMask::set(int bit, bool value ) {
@@ -884,9 +1015,11 @@ void BitMask::set(int bit, bool value ) {
     int col = bit % MOD;
     if( value == 1){
         masks[row] |= (int) value << col;
+        count++;
     }
     else if( value == 0 ){
         masks[row] &= (int) value << col;
+        count--;
     }
     else{
         return;
@@ -1045,8 +1178,7 @@ __global__ void leafSim( GoStateStruct* gss,
     //because of mem variables like BitMask.  Fix eventually
     __shared__ GoStateStruct gss_local;
     __shared__ ZobristHash zhasher_local;
-    //__shared__ BitMask legal;
-    //__shared__ BitMask illegal;
+
     __syncthreads();
     if( tid == 0 ){
         //TODO modify BitMask to fit this paradig,
@@ -1056,45 +1188,16 @@ __global__ void leafSim( GoStateStruct* gss,
     }
     __syncthreads();
 
-
-    //TODO all this is parallel code for a randomActino impl, why did i put here
-    char color = gss_local.player;
-    int ix = tid;
-    while( ix < BOARDSIZE ){
-        int legal = testLegality( ix, color );
-        //definitely not legal
-        if( legal == 0 ){
-        }
-        //definitely legal
-        else if( legal == 1 ){
-        }
-        //further checking needed (sequentially by one thread)
-        else{
-        }
-        ix += NUM_THREADS;
-    }
-
-    __syncthreads();
-
-    //now let thread 0 go through the ambiguous ones as before
-    if( !legal.get(ix) && !illegal.get(ix) ){
-        
-
+    /*
     winners[tid] = tid+42;
     if( tid % 2 == 0 ){
         int num = zhasher_local.updateHash( gss_local.zhash, tid, BLACK );
         iterations[tid/2] = num; 
     }
 
-    __syncthreads();
+    __syncthreads();*/
 
-    //TODO: make ZobristHash Local as well,  arg waste more space
     //do if tid == 0 here, race conditions?
-    /*
-    gss->copyInto( &gss_local );
-    zh->copyInto( &zhasher_local );
-    gss_local.zhasher = &zhasher_local;
-
     BitMask to_exclude;
     int count = 0;
     while( count < MAX_MOVES && !gss_local.isTerminal() ){
@@ -1105,7 +1208,7 @@ __global__ void leafSim( GoStateStruct* gss,
 
     iterations[tid] = count;
     gss_local.getRewards( &(winners[tid*2]) );
-    */
+    
 
 }
 
@@ -1223,6 +1326,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         for( int i=0; i<NUM_SIMULATIONS; i++ ){
             t1 = clock();
             GoStateStruct* linear = (GoStateStruct*) gss->copy();
+             
             t1b = clock();
             tcopy_avg += t1b-t1;
             BitMask to_exclude;
@@ -1230,12 +1334,13 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             while( move_count < MAX_MOVES && !linear->isTerminal() ){
                 t2 = clock();
                 int action = linear->randomAction( &to_exclude, true );
-                //printf( "%s\n\n", linear->toString().c_str() );
+                printf( "%s\n\n", linear->toString().c_str() );
+
                 t2b = clock();
                 trand_avg += t2b-t2;
 
-                //cout << "hit any key..." << endl;
-                //cin.ignore();
+                cout << "hit any key..." << endl;
+                cin.ignore();
                 
                 t3b = clock();
                 tappl_avg += t3b-t3;
@@ -1258,10 +1363,10 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         }
         int tb = clock();
         printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-        printf("avg copy time: %f\n", ((float) tcopy_avg)/NUM_SIMULATIONS/CLOCKS_PER_SEC);
-        printf("avg rand time: %f\n", ((float) trand_avg)/total_move_count/CLOCKS_PER_SEC);
-        //printf("avg appl time: %f\n", ((float) tappl_avg)/total_move_count/CLOCKS_PER_SEC);
-        printf("avg rewd time: %f\n", ((float) trewd_avg)/NUM_SIMULATIONS/CLOCKS_PER_SEC);
+        printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
+        printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
+        //printf("avg appl time: %f\n", ((float) tappl_avg)/CLOCKS_PER_SEC);  // /div by total_move_count to get avg
+        printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
         
     }
 

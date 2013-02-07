@@ -20,7 +20,7 @@ int main(){
     //cout << sizeof(COLOR) << endl;
     //cout << sizeof(int) << endl;
     //cout << sizeof(char) << endl;
-    //cout << sizeof(bool) << endl;
+    cout << sizeof(bool) << endl;
     cout << sizeof(GoStateStruct) << endl;
     //cout << PAST_STATE_SIZE << endl;
     

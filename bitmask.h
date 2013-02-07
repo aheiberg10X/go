@@ -7,6 +7,7 @@
 
 struct BitMask {
     int masks[BITMASK_SIZE];
+    int count;
 
     __device__ __host__ BitMask();
     

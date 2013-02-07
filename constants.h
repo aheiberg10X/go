@@ -4,10 +4,10 @@
 #include <math.h>
 
 //Use the GPU?
-#define USE_GPU true
+#define USE_GPU false
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 2
+#define NUM_SIMULATIONS 20000
 #define NUM_THREADS 4 
 
 //How many itertions of MCTS before best move selected?

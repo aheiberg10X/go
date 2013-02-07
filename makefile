@@ -1,7 +1,7 @@
-CFLAGS = #--cubin #--ptxas-options=-v #-pg
+CFLAGS=-pg #--cubin #--ptxas-options=-v #-pg
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
-CMPLR = nvcc 
+CMPLR=nvcc 
 
 #all:  clean go
 #all: cleango goonly
@@ -9,13 +9,13 @@ all: clean shared
 #all: clean benchmark
 
 benchmark: kernel.o 
-	nvcc -o kernel kernel.o
+	nvcc -o kernel kernel.o ${CFLAGS}
 
 shared: kernel.o godomain.o mcts.o go.o
-	nvcc -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o
+	nvcc -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o ${CFLAGS}
 
 kernel.o:
-	nvcc -c kernel.cu
+	nvcc -c kernel.cu ${CFLAGS}
 
 mcts.o : mcts_node.o
 	${CMPLR} -c mcts.cpp ${CFLAGS}
