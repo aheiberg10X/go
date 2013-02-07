@@ -51,7 +51,8 @@ struct GoStateStruct{
 
     //data structure for floodFill
     BitMask marked;
-    BitMask on_queue;
+    /*BitMask on_queue;*/
+    BitMask connected_to_lib;
     Queue queue;
 
     __host__
@@ -138,6 +139,7 @@ struct GoStateStruct{
                         int filter_len );
 
 
+    /*
     __device__ __host__
     bool floodFill(  
                     int* to_fill,
@@ -147,13 +149,14 @@ struct GoStateStruct{
                     char* flood_color_array,
                     int filter_len,
                     char* stop_color_array,
-                    int stop_len );
+                    int stop_len );*/
 
     __device__ __host__
     bool floodFill2( 
             /*int* to_fill,*/
             /*int* to_fill_len,*/
-            BitMask* flooded, 
+            /*BitMask* connected_to_*/
+            /*BitMask* flooded, */
                     int epicenter_ix,
                     int adjacency,
                     char flood_color,

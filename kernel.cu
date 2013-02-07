@@ -351,24 +351,28 @@ void GoStateStruct::filterByColor(
 }
 
 bool GoStateStruct::floodFill2(  
-                BitMask* marked, 
+        //BitMask* connected_to_lib
+        //BitMask* marked, 
                 int epicenter_ix,
                 int adjacency,
                 char flood_color,
                 char stop_color ){
 
-    on_queue.clear(); //initBitMask();
+    //on_queue.clear(); //initBitMask();
     queue.clear(); //initQueue();
-    //marked.clear();
+    marked.clear();
 
+    //cout << "epicenter: " << epicenter_ix << endl;
     queue.push( epicenter_ix );
+    //connected_to_lib.set( epicenter_ix, true );
+    marked.set( epicenter_ix, true );
     
     //int neighbs[adjacency];
     bool stop_color_not_encountered = true;
 
     while( !queue.isEmpty() ){
         int ix = queue.pop();
-        marked->set( ix, true);
+        //marked->set( ix, true);
  
         //find if there are neighbors that cause flood fill to stop
         int filtered_len = 0;
@@ -379,8 +383,14 @@ bool GoStateStruct::floodFill2(
 
         bool stop_color_is_in_neighbs = filtered_len > 0;
         if( stop_color_is_in_neighbs ){
+            //cout << "stop color in neighbs" << endl;
             stop_color_not_encountered = false;
             break;
+        }
+        else if( connected_to_lib.get(ix) ){
+            //cout << "ix: " << ix << " connected to lib" << endl;
+            stop_color_not_encountered = false;
+            continue;
         }
         else {
             neighborsOf2( internal_filtered_array,
@@ -391,10 +401,14 @@ bool GoStateStruct::floodFill2(
             //if not, add them
             //assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
-                int ix = internal_filtered_array[faix];
-                if( !marked->get( ix) && !on_queue.get( ix) ){
-                    queue.push(ix);
-                    on_queue.set( ix,true);
+                int nix = internal_filtered_array[faix];
+                //cout << "same color neighb of: " << ix << " : " << nix << endl;
+                if( /*!marked->get( ix) &&*/ !marked.get( nix) ){
+                    //cout << "pushing: " << nix << " on queue" << endl;
+                    queue.push(nix);
+                    marked.set( nix,true);
+                    //will clear this if turns out no libs
+                    //connected_to_lib.set( ix, true );
                 }
             }
         }
@@ -403,7 +417,7 @@ bool GoStateStruct::floodFill2(
     return stop_color_not_encountered;
 }
 
-
+/*
 bool GoStateStruct::floodFill(  
                 int* to_fill,
                 int* to_fill_len,
@@ -476,7 +490,7 @@ bool GoStateStruct::floodFill(
     *to_fill_len = i;
 
     return stop_color_not_encountered;
-}
+}*/
 
 bool GoStateStruct::isSuicide( int action ){
     char color = action2color( action );
@@ -509,28 +523,32 @@ bool GoStateStruct::isSuicide( int action ){
     //If one of the groups has no liberties, the move is illegal
     //(Remember space making opponent captures have already been applied)
     bool left_with_no_liberties = false;
-    BitMask marked;
+    //BitMask marked;
     char stop_array[1] = {EMPTY};
     for( int i=0; i < filtered_len; i++ ){
         int nix = filtered[i];
         //cout << "nix: " << nix << endl;
-        if( marked.get( nix ) ){ continue; }
+        //if( marked.get( nix ) ){ continue; }
+        //if( connected_to_lib.get( nix ) ){ continue; }
 
-        int flood_len = 0;
+        //int flood_len = 0;
         bool fill_completed = 
-        floodFill( floodfill_array, &flood_len,
-                   nix,
-                   adjacency,
-                   colors, 1,
-                   stop_array, 1 );
+            floodFill2( nix, adjacency, color, EMPTY );
+        //cout << "nix: " << nix << " fill compl: " << fill_completed << endl;
+        //floodFill( floodfill_array, &flood_len,
+        //nix,
+        //adjacency,
+        //colors, 1,
+        //stop_array, 1 );
 
+        /*
         if( fill_completed ){
             for( int j=0; j < flood_len; j++ ){
                 //cout << "marking: " << floodfill_array[j] << endl;
                 //marked.insert( floodfill_array[j] );
                 marked.set( floodfill_array[j], true );
             }
-        }
+        }*/
         //cout << "nix: " << nix << "no_liber: " << (flood_len > 0) << endl;
         left_with_no_liberties |= fill_completed;
     }
@@ -603,6 +621,7 @@ bool GoStateStruct::applyAction( int action,
     if( ! isPass(action) ){
         //assert( state->action2color(action) == state->player );
         //char color = state->action2color(action);
+        //cout << "setting: " << ix << endl;
         setBoard( ix, color );
 
         //resolve captures
@@ -627,6 +646,7 @@ bool GoStateStruct::applyAction( int action,
         //}
 
         //int a = clock();
+        connected_to_lib.clear();
         for( int onix=0; onix < opp_len; onix++ ){
             //int floodfill_len = 0;
             //char stop_color_array[1] = {EMPTY};
@@ -640,15 +660,20 @@ bool GoStateStruct::applyAction( int action,
                 //stop_color_array, 1 );
 
                 floodFill2( 
-                &marked, 
-                filtered_array[onix],
-                adjacency,
-                opp_color,
-                EMPTY );
+                        //&connected_to_lib, 
+                        //&marked, 
+                    filtered_array[onix],
+                    adjacency,
+                    opp_color,
+                    EMPTY );
 
             if( fill_completed ){
+                connected_to_lib.clear();
                 capture( &marked );
                 //setBoard( floodfill_array, floodfill_len, EMPTY );
+            }
+            else {
+                connected_to_lib.Or( marked );
             }
         }
         //int b = clock();
@@ -659,6 +684,7 @@ bool GoStateStruct::applyAction( int action,
         //a = clock();
         if( isSuicide( action ) ){
             legal = false;
+            //cout << "is suicide" << endl;
         }
         //b = clock();
         //cout << "suicide check time: " << (b-a) << endl;
@@ -680,7 +706,7 @@ bool GoStateStruct::applyAction( int action,
         }*/
     }
     
-    cout << "legal" << legal << endl;
+    //cout << "legal" << legal << endl;
     if( legal ){
         if( side_effects ){
             //cout << "legal and side effects" <<endl;
@@ -769,13 +795,13 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
     bool legal_but_excluded_move_available = false;
     for( int j=0; j<num_open; j++ ){
         int ix = empty_ixs[j];
-        cout << "candidatae: "<< ix << endl;
+        //cout << "candidatae: "<< ix << endl;
         bool ix_is_excluded = to_exclude->get(ix);
         if( legal_but_excluded_move_available ){
             if( ! ix_is_excluded ){
                 bool is_legal = applyAction( ix, side_effects );
                 if( is_legal ){
-                    cout << "num tried until legal1: " << j << endl;
+                    //cout << "num tried until legal1: " << j << endl;
                     return ix;
                 }
             }
@@ -787,7 +813,7 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
                     legal_but_excluded_move_available = true;
                 }
                 else{
-                    cout << "num tried until legal: " << j << endl;
+                    //cout << "num tried until legal: " << j << endl;
                     return ix;
                 }
             }
@@ -1030,6 +1056,12 @@ bool BitMask::get( int bit ){
     int row = bit / MOD;
     int col = bit % MOD;
     return (bool) ((masks[row] >> col) & 1);
+}
+
+void BitMask::Or( BitMask bm ){
+    for( int i=0; i<BITMASK_SIZE; i++ ){
+        masks[i] |= bm.masks[i];
+    }
 }
 
 

@@ -17,6 +17,8 @@ struct BitMask {
     __device__ __host__ void set( int bit, bool value );
 
     __device__ __host__ bool get( int bit );
+    
+    __device__ __host__ void Or( BitMask bm );
 
 };
 
