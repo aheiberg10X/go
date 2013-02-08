@@ -9,6 +9,7 @@ struct Queue{
     //int length;
     int array[BOARDSIZE];
     int begin, end;
+    int nElems;
 
     __device__ __host__ Queue();
 

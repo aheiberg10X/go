@@ -71,18 +71,20 @@ void GoStateStruct::ctor(ZobristHash* zh){
 }
 
 void GoStateStruct::freezeBoard(){
-    for( int i=0; i<BOARDSIZE; i++ ){
-        frozen_board[i] = board[i];
-    }
+    //for( int i=0; i<BOARDSIZE; i++ ){
+    //frozen_board[i] = board[i];
+    //}
+    memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
     frozen_num_open = num_open;
     frozen_zhash = zhash;
 }
 
 void GoStateStruct::thawBoard(){
-    for( int i=0; i<BOARDSIZE; i++ ){
-        //setBoard(i, frozen_board[i]);
-        board[i] = frozen_board[i];
-    }
+    //for( int i=0; i<BOARDSIZE; i++ ){
+    ////setBoard(i, frozen_board[i]);
+    //board[i] = frozen_board[i];
+    //}
+    memcpy( board, frozen_board, BOARDSIZE*sizeof(char) );
     num_open = frozen_num_open;
     zhash = frozen_zhash;
 }
@@ -500,13 +502,7 @@ bool GoStateStruct::isSuicide( int action ){
 
     neighborsOf( neighbor_array, ix, adjacency );
 
-    bool surrounded_by_kin = true;
-    for( int i=0; i<adjacency; i++ ){
-        int ncolor = ix2color( neighbor_array[i] );
-        surrounded_by_kin &= ncolor == color || ncolor == OFFBOARD;
-    }
-    if( surrounded_by_kin ){ return surrounded_by_kin; }
-
+    
     //same colored neighbors
     char colors[1] = {color};
     int filtered[ADJ_PLUS_ONE];
@@ -610,100 +606,70 @@ bool GoStateStruct::applyAction( int action,
     //cout << state->toString() << endl;
 
     bool legal = true;
-    freezeBoard();
+    bool board_frozen = false;
 
     //The action parameter is really the index of the action to be taken
     //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
     int ix = action;
     char color = player;
+    char opp_color = flipColor(color); 
     action = ix2action( ix, color);
 
     if( ! isPass(action) ){
         //assert( state->action2color(action) == state->player );
         //char color = state->action2color(action);
         //cout << "setting: " << ix << endl;
-        setBoard( ix, color );
 
-        //resolve captures
         int adjacency = 4;
-        //neighborsOf( neighbor_array, ix, adjacency );
-        char opp_color = flipColor(color); 
-
-        int opp_len = 0;
-        //char filter_array[1] = {opp_color};
-        //filterByColor( filtered_array, &opp_len,
-        //neighbor_array, adjacency,
-        //filter_array, 1 );
-
-        neighborsOf2( filtered_array, &opp_len, 
-        ix, adjacency, opp_color );
-
-        //if( opp_len == 0 ){
-        //cout << "no FF necessary" << endl;
-        //}
-        //else{
-        //cout << "yes FF" << endl;
-        //}
-
-        //int a = clock();
-        connected_to_lib.clear();
-        for( int onix=0; onix < opp_len; onix++ ){
-            //int floodfill_len = 0;
-            //char stop_color_array[1] = {EMPTY};
-            marked.clear();
-            bool fill_completed =
-
-                //floodFill( floodfill_array, &floodfill_len,
-                //filtered_array[onix],
-                //adjacency,
-                //filter_array, 1,
-                //stop_color_array, 1 );
-
-                floodFill2( 
-                        //&connected_to_lib, 
-                        //&marked, 
-                    filtered_array[onix],
-                    adjacency,
-                    opp_color,
-                    EMPTY );
-
-            if( fill_completed ){
-                connected_to_lib.clear();
-                capture( &marked );
-                //setBoard( floodfill_array, floodfill_len, EMPTY );
-            }
-            else {
-                connected_to_lib.Or( marked );
-            }
+        neighborsOf( neighbor_array, ix, adjacency );
+        bool surrounded_by_kin = true;
+        bool no_opp_color_neighbors = true;
+        for( int i=0; i<adjacency; i++ ){
+            int ncolor = ix2color( neighbor_array[i] );
+            surrounded_by_kin &= ncolor == color || ncolor == OFFBOARD;
+            no_opp_color_neighbors &= ncolor != opp_color;
         }
-        //int b = clock();
-        //if( opp_len > 0 ){
-        //cout << "FF time: " << (b-a) << endl;
-        //}
-
-        //a = clock();
-        if( isSuicide( action ) ){
+        if( no_opp_color_neighbors && !surrounded_by_kin ){
+            setBoard( ix, color );
+            legal = true;
+        }
+        else if( surrounded_by_kin ){
             legal = false;
-            //cout << "is suicide" << endl;
         }
-        //b = clock();
-        //cout << "suicide check time: " << (b-a) << endl;
-        //cout << "checked for suicide" << endl;
+        else{  //must check for captures
+            freezeBoard();
+            board_frozen = true;
 
-        //TODO
-        //change this for new abstraction
-        //check past states for duplicates
-        legal &= !isDuplicatedByPastState();
-        //cout << "checked for dupes" << endl;
-        /*
-        for( int i=0; i < NUM_PAST_STATES; i++ ){
-            GoStateStruct* past_state = state->past_states[i];
-            if( state->sameAs( past_state->board,
-                        state->flipColor( past_state->player ) ) ){
-                legal = false;
-                break;
+            setBoard( ix, color );
+            int opp_len = 0;
+            neighborsOf2( filtered_array, &opp_len, 
+                          ix, adjacency, opp_color );
+
+            connected_to_lib.clear();
+            for( int onix=0; onix < opp_len; onix++ ){
+                marked.clear();
+                bool fill_completed =
+                    floodFill2( 
+                        filtered_array[onix],
+                        adjacency,
+                        opp_color,
+                        EMPTY );
+                if( fill_completed ){
+                    connected_to_lib.clear();
+                    capture( &marked );
+                }
+                else {
+                    connected_to_lib.Or( marked );
+                }
             }
-        }*/
+            if( isSuicide( action ) ){
+                legal = false;
+            }
+        }
+        legal &= !isDuplicatedByPastState();
+    }
+    else{
+        //PASS played
     }
     
     //cout << "legal" << legal << endl;
@@ -718,12 +684,16 @@ bool GoStateStruct::applyAction( int action,
         }
         else{
             //cout << "legal, no se" << endl;
-            thawBoard();
+            if( board_frozen ){
+                thawBoard();
+            }
         }
         return true;
     }
     else{
-        thawBoard();
+        if( board_frozen ){
+            thawBoard();
+        }
         return false;
     }  
 }
@@ -821,7 +791,10 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
     }
     
     if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
-    else { return PASS; }
+    else { 
+        applyAction( PASS, side_effects );
+        return PASS;
+    }
 
 }
 
@@ -1079,28 +1052,31 @@ Queue::Queue(){
 }
 
 void Queue::clear(){
-    for( int i=0; i<BOARDSIZE; i++){
-        array[i] = -1;
-    }
+    //for( int i=0; i<BOARDSIZE; i++){
+    //array[i] = -1;
+    //}
     begin = 0;
     end = 0;
+    nElems = 0;
 }
 
 void Queue::push( int a ){
     array[end] = a;
     end = ringInc( end );
+    nElems++;
     return;
 }
 
 int Queue::pop(){
     int r = array[begin];
-    array[begin] = -1;
+    //array[begin] = -1;
     begin = ringInc(begin);
+    nElems--;
     return r;
 }
 
 bool Queue::isEmpty(){
-    return begin == end && array[end] == -1;
+    return nElems == 0; //begin == end && array[end] == -1;
 }
 
 
@@ -1366,13 +1342,13 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
             while( move_count < MAX_MOVES && !linear->isTerminal() ){
                 t2 = clock();
                 int action = linear->randomAction( &to_exclude, true );
-                printf( "%s\n\n", linear->toString().c_str() );
 
                 t2b = clock();
                 trand_avg += t2b-t2;
 
-                cout << "hit any key..." << endl;
-                cin.ignore();
+                //printf( "%s\n\n", linear->toString().c_str() );
+                //cout << "hit any key..." << endl;
+                //cin.ignore();
                 
                 t3b = clock();
                 tappl_avg += t3b-t3;
