@@ -24,6 +24,9 @@ struct GoStateStruct{
     int zhash;
     int action;
     int num_open;
+    /*char open_intersections[BOARDSIZE];*/
+    BitMask open_intersections;
+    BitMask frozen_open_intersections;
     char player;
 
 
@@ -35,6 +38,7 @@ struct GoStateStruct{
     int past_zhashes[NUM_PAST_STATES];
     /*char past_boards[PAST_STATE_SIZE]; */
     /*char past_players[NUM_PAST_STATES];*/
+    //TODO: do we ever use the past actions other than the most recent?
     int past_actions[NUM_PAST_STATES];
 
     //scratch space for floodFill

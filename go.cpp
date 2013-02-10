@@ -34,6 +34,9 @@ int main(){
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
         gss->zhash = 42;
+
+        //BitMask* to_exclude = new BitMask;
+        //int action = gss->randomAction( to_exclude, false );
         int rewards[2];
         launchSimulationKernel( gss, rewards );
     }

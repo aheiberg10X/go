@@ -68,6 +68,11 @@ void GoStateStruct::ctor(ZobristHash* zh){
         past_zhashes[i] = 0;
         //past_players[i] = OFFBOARD;
     }
+
+    //marked.clear();
+    //connected_to_lib.clear();
+    //queue.clear();
+    open_intersections.clear();
 }
 
 void GoStateStruct::freezeBoard(){
@@ -77,6 +82,7 @@ void GoStateStruct::freezeBoard(){
     memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
     frozen_num_open = num_open;
     frozen_zhash = zhash;
+    //open_intersections
 }
 
 void GoStateStruct::thawBoard(){
@@ -96,18 +102,29 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     target->num_open = num_open;
     target->frozen_num_open = frozen_num_open;
     target->zhasher = zhasher;
+    memcpy( target->board, board, BOARDSIZE*sizeof(char) );
+    memcpy( target->frozen_board, frozen_board, BOARDSIZE*sizeof(char) );
+    /*
     for( int i=0; i<BOARDSIZE; i++ ){
         target->board[i] = board[i];
         target->frozen_board[i] = frozen_board[i];
     }
+    */
     //for( int i=0; i<PAST_STATE_SIZE; i++ ){
     //target->past_boards[i] = past_boards[i];
     //}
+    //TODO: do we every use the past actions besides the most recent?
+    memcpy( target->past_actions, past_actions, NUM_PAST_STATES*sizeof(int) );
+    memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
+    /*
     for( int i=0; i<NUM_PAST_STATES; i++ ){
         //target->past_players[i] = past_players[i];
         target->past_actions[i] = past_actions[i];
         target->past_zhashes[i] = past_zhashes[i];
     }
+    */
+
+    open_intersections.copyInto( &(target->open_intersections) );
 }
 
 //no need for copyInto and copy
@@ -264,11 +281,13 @@ void GoStateStruct::setBoard( int ix, char color ){
     if( color == EMPTY ){ 
         zhash = zhasher->updateHash( zhash, ix, incumbant_color );
         num_open++; 
+        //open_intersections.set( ix, true );
     } 
     else{ 
         //assert( board[ix] == EMPTY ); 
         zhash = zhasher->updateHash( zhash, ix, color );
         num_open--; 
+        //open_intersections.set( ix, false );
     } 
     board[ix] = color; 
 }
@@ -848,21 +867,80 @@ int GoStateStruct::smarterRandomAction( BitMask* to_exclude,
     else { return PASS; }
 }
 
-                                        
-
 __host__
 int GoStateStruct::randomAction( BitMask* to_exclude, 
                                  bool side_effects ){
-    //cout << "inside randomAction" << endl;
-    //GoStateStruct* state = (GoStateStruct*) uncast_state;
-    int size = num_open; //state->open_positions.size();
-    int empty_ixs[ /*BOARDSIZE*/ size  ];
-    //cout << "size: " << size << endl;
-    //
-    int nEmpty = 0;
+    int empty_intersections[num_open];
 
-    int i = 0;
-    int j;
+    int end = num_open-1;
+    int begin = num_open;
+    int r;
+
+    bool legal_but_excluded_move_available = false;
+
+    int board_ix, num_needed, num_found;
+    while( end >= 0 ){
+        r = rand() % (end+1);
+        //cout << "end: " << end << " begin: " << begin << " rand: " << r << endl;
+        if( r < begin ){
+            num_needed = begin-r;
+            num_found = 0;
+            while( num_found < num_needed ){
+                if( board[board_ix] == EMPTY ){
+                    begin--;
+                    //cout << "placing ix: " << board_ix << " at: " << begin << endl;
+                    empty_intersections[begin] = board_ix;
+                    num_found++;
+                }
+                board_ix++;
+                assert( board_ix <= BOARDSIZE );
+            }
+        }
+        //swap v[end] and v[r]
+        int temp = empty_intersections[end];
+        empty_intersections[end] = empty_intersections[r];
+        empty_intersections[r] = temp;
+
+        //test whether the move legal and not excluded
+        //return intersection if so
+        int candidate = empty_intersections[end];
+        //cout << "candidate: " << candidate << endl;
+        bool ix_is_excluded = to_exclude->get(candidate);
+        if( legal_but_excluded_move_available ){
+            if( ! ix_is_excluded ){
+                bool is_legal = applyAction( candidate, side_effects );
+                if( is_legal ){
+                    //cout << "num tried until legal1: " << j << endl;
+                    return candidate;
+                }
+            }
+        }
+        else{
+            bool is_legal = applyAction( candidate, side_effects );
+            if( is_legal ){
+                if( ix_is_excluded ){
+                    legal_but_excluded_move_available = true;
+                }
+                else{
+                    //cout << "num tried until legal: " << j << endl;
+                    return candidate;
+                }
+            }
+        }
+
+        //if did not return a legal move, keep going
+        end--;
+    }
+
+
+    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
+    else { 
+        applyAction( PASS, side_effects );
+        return PASS;
+    }
+
+    /*
+
     //can shuffle randomly as we insert...
     for( int ix=0; ix<BOARDSIZE; ix++ ){
         //cout << "random shuffle i: " << i << endl;
@@ -881,6 +959,8 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     }
     assert( nEmpty == num_open );
     return randomActionBase( to_exclude, side_effects, empty_ixs );
+
+    */
 }
 
 bool GoStateStruct::isTerminal(){
@@ -1001,6 +1081,15 @@ BitMask::BitMask(){
     clear();
 }
 
+void BitMask::copyInto( BitMask* target ){
+    memcpy( target->masks, masks, BITMASK_SIZE*sizeof(int) );
+    //for( int i=0; i<BITMASK_SIZE; i++ ){
+    //bm->masks[i] = masks[i];;
+    //}
+    target->count = count;
+}
+
+
 void BitMask::clear(){
     for( int i=0; i<BITMASK_SIZE; i++ ){
         masks[i] = 0;
@@ -1099,9 +1188,10 @@ void ZobristHash::ctor(){
 //}
 
 void ZobristHash::copyInto( ZobristHash* target ){
-    for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
-        target->values[ix] = values[ix];
-    }
+    memcpy( target->values, values, NUM_ZOBRIST_VALUES*sizeof(int) );
+    //for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
+    //target->values[ix] = values[ix];
+    //}
 }
 
 int ZobristHash::getValue( char color, int ix ){

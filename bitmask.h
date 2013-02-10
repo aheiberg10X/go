@@ -20,6 +20,8 @@ struct BitMask {
     
     __device__ __host__ void Or( BitMask bm );
 
+    __device__ __host__ void copyInto( BitMask* bm );
+
 };
 
 
