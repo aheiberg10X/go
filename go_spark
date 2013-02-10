@@ -1,3 +1,91 @@
+2/9/13
+
+The most time is now spent in random action, presumable iterating through the entire board and randomly shuffling it before testing legality is slow.  Have sped up 2x by being lazy about the Fisher-Yates in-place shuffle.  That is, we generate a random number between 0 and num_empty.  If this falls outside the range of empty values discovered in board, we need to iterate through the board some more add find more empties.  Once we have enough, do the swap and test for legality.  If it fails, we iterate on the empty array with the just failed intersection chopped off the end.  But now, when we generate a rand, it is more likely to fall within our range.  This way, the expected number of positions we need to iterate through on the board, as well as the number of rands and swaps we need to do, is reduced because we stop doing it once an acceptable intersection is found.
+
+=============================================================
+
+2/7/13
+
+Wrestling with floodFill somemore, changed only have one bitMask.  Use another to use results of previous fill when filling neighbor.  For example, if a flood fill from the East neighb runs into stones already explored on the North neighbors FF, we can know for free that the east neighbor string won't be captured.
+
+So BM get and set are being called less, but applyAction is now called ~3 times more often. why?
+
+Maybe related to fact that randomAction doesn't seem to be passing soon enough.  It just sits there spinning its wheels before starting a new game
+
+Also, do short circuit of applyAction that doesn't have to call floodFill, freezeBoard.  i.e all neighbs empty or same  color => auto place if side_effects if true, then done.
+
+Also, if legal already false, don't need to do other test.  Whcih one first though?
+
+--------------
+
+short circuited apply Action
+sped up freeze/thawBoard with memcpy
+fixed issue with PASS moves not being applied
+
+20k playout / 6s
+
+Further:
+
+can take out adding self stone to isSuicide flood fills, obviated by self short circuiting in applyAction(are you sure?)
+can use getNeighbors2 in isSuicide
+can avoid hist check if move already illegal
+
+================================================================
+
+
+2/6/13
+
+Fixed prob with applyAction not rolling back illegal moves
+
+BitMask set and Queue are taking up all the time, what to do?
+
+=============================================================================================
+
+2/5/13
+
+Optimizing wise, 
+	-need to fix randomAction (see the 28th)                check
+	-fit board rep into bits
+	-merge getNeighbors and filter into one unit            check
+	-applyAction doesn't need an array, just a bit mask     check
+	-give bit masks a length counter                        check
+
+Right, so we are looking at two parallization paths:
+
+1) CPU - root parallelization
+	-should be straightforward application of OpenMP pramas.  No shared memory to worry about
+
+2) GPU - leaf parallelization
+	-can speed up randomAction by finding obvious legal and illegal moves in parallel, then testing complicated captures in sequence
+	- but really applyAction, specifically floodFill, is where the most work is being done
+		-TODO: profile to make sure this is really were the bottleneck is
+		- speed up repeated filter neighbors action as per above (can be parallelized gains seem miniscule compared to payoff)
+		- parallelize floodFill
+			- create floodFill kernel, where multiple threads pop intersections off the queue, and add appropriate neighbors onto the queue
+				-necessitate locking the queue for safety (but not the BitMasks 'marked' and 'onqueue' because they read or go 0->1)
+					-lock struct can be built with atomicAnd()
+			- could create one block per opp_color neighbor that needs to be tested for capture (would require separate BitMasks and return booleans, how does work intradevice?)
+			-Overhead outweigh the cost?
+			
+3) GPU - global memory datastructure for more efficient liberty determination
+	- not sure how would work, how much more efficient would be
+
+
+Proposed Lock impl:
+
+lock = false
+not_held[num_threads] = [True,...]		
+
+def acquire(thread_id) {
+	while( not_held[thread_id] ){
+		not_held[thread_id] = atomicAnd( lock, true )
+	}
+	return
+}
+
+=============================================================================================================================================
+
+
 1/31/13
 
 Good ref here: http://developer.download.nvidia.com/CUDA/training/NVIDIA_GPU_Computing_Webinars_CUDA_Memory_Optimization.pdf
