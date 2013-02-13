@@ -870,25 +870,28 @@ int GoStateStruct::smarterRandomAction( BitMask* to_exclude,
 __host__
 int GoStateStruct::randomAction( BitMask* to_exclude, 
                                  bool side_effects ){
+    //stores the empty positions we come across in board
+    //filled from right to left
     int empty_intersections[num_open];
-
     int end = num_open-1;
     int begin = num_open;
     int r;
 
     bool legal_but_excluded_move_available = false;
 
+    //board_ix tracks our progress through board looking for empty intersections
     int board_ix, num_needed, num_found;
     while( end >= 0 ){
         r = rand() % (end+1);
-        //cout << "end: " << end << " begin: " << begin << " rand: " << r << endl;
+        //we want to swap the rth and end_th empty intersections.
+        //but we are lazy, so don't the rth position might not be filled yet
+        //if not, keep searching through board until more are found
         if( r < begin ){
             num_needed = begin-r;
             num_found = 0;
             while( num_found < num_needed ){
                 if( board[board_ix] == EMPTY ){
                     begin--;
-                    //cout << "placing ix: " << board_ix << " at: " << begin << endl;
                     empty_intersections[begin] = board_ix;
                     num_found++;
                 }
@@ -896,7 +899,8 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
                 assert( board_ix <= BOARDSIZE );
             }
         }
-        //swap v[end] and v[r]
+
+        //swap empty[end] and empty[r]
         int temp = empty_intersections[end];
         empty_intersections[end] = empty_intersections[r];
         empty_intersections[r] = temp;
