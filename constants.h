@@ -17,7 +17,7 @@
 
 //GoStateStruct Constants
 //set these
-#define DIMENSION 9
+#define DIMENSION 19 
 
 //Leave these alone
 #define BIGDIM (DIMENSION+2)

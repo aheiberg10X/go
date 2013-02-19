@@ -24,9 +24,6 @@ struct GoStateStruct{
     int zhash;
     int action;
     int num_open;
-    /*char open_intersections[BOARDSIZE];*/
-    BitMask open_intersections;
-    BitMask frozen_open_intersections;
     char player;
 
 
@@ -36,17 +33,17 @@ struct GoStateStruct{
     int frozen_zhash;
 
     int past_zhashes[NUM_PAST_STATES];
-    /*char past_boards[PAST_STATE_SIZE]; */
-    /*char past_players[NUM_PAST_STATES];*/
     //TODO: do we ever use the past actions other than the most recent?
-    int past_actions[NUM_PAST_STATES];
+    //No, only use the last action in check inside isTerminal...
+    /*int past_actions[NUM_PAST_STATES];*/
+    int past_action;
 
     //scratch space for floodFill
     //TODO
     //save space by treating this as char array. Numbers [0,121] < 2^8
     //alternatively, save it as a BitMask, and iterate through each time to 
     //get the marked elements
-    int floodfill_array[BOARDSIZE];
+    /*int floodfill_array[BOARDSIZE];*/
     int neighbor_array[8];
     int internal_neighbor_array[8];
     int filtered_array[8];
@@ -55,7 +52,6 @@ struct GoStateStruct{
 
     //data structure for floodFill
     BitMask marked;
-    /*BitMask on_queue;*/
     BitMask connected_to_lib;
     Queue queue;
 
@@ -75,11 +71,6 @@ struct GoStateStruct{
 
     __device__ __host__
     char flipColor( char c );
-
-    __device__ __host__
-    bool sameAs( char* board, char player );
-
-    /*bool sameAs( GoStateStruct* gss2 );*/
 
     __device__ __host__
     void togglePlayer( );
@@ -196,9 +187,6 @@ struct GoStateStruct{
     __host__ 
     int randomAction( BitMask* to_exclude, bool side_effects );
 
-    __host__
-    int smarterRandomAction( BitMask* to_exclude, bool side_effects );
-
     __host__ __device__
     int randomActionBase( BitMask* to_exclude, bool side_effects, int* empty_ixs);
 
@@ -207,6 +195,10 @@ struct GoStateStruct{
 
     __device__ __host__
     void getRewards( int* to_fill );
+
+    //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
+    /*__device__ __host__*/
+    /*void getRewardsComplete( int* to_fill );*/
 
 };
 

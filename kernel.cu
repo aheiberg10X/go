@@ -60,36 +60,24 @@ void GoStateStruct::ctor(ZobristHash* zh){
             num_open++;
         }
     }
-    //for( int i=0; i<PAST_STATE_SIZE; i++ ){
-    //past_boards[i] = OFFBOARD;
-    //}
+    past_action = -1;
     for( int i=0; i<NUM_PAST_STATES; i++ ){
-        past_actions[i] = -1;
+        //past_actions[i] = -1;
         past_zhashes[i] = 0;
-        //past_players[i] = OFFBOARD;
     }
 
     //marked.clear();
     //connected_to_lib.clear();
     //queue.clear();
-    open_intersections.clear();
 }
 
 void GoStateStruct::freezeBoard(){
-    //for( int i=0; i<BOARDSIZE; i++ ){
-    //frozen_board[i] = board[i];
-    //}
     memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
     frozen_num_open = num_open;
     frozen_zhash = zhash;
-    //open_intersections
 }
 
 void GoStateStruct::thawBoard(){
-    //for( int i=0; i<BOARDSIZE; i++ ){
-    ////setBoard(i, frozen_board[i]);
-    //board[i] = frozen_board[i];
-    //}
     memcpy( board, frozen_board, BOARDSIZE*sizeof(char) );
     num_open = frozen_num_open;
     zhash = frozen_zhash;
@@ -104,52 +92,18 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     target->zhasher = zhasher;
     memcpy( target->board, board, BOARDSIZE*sizeof(char) );
     memcpy( target->frozen_board, frozen_board, BOARDSIZE*sizeof(char) );
-    /*
-    for( int i=0; i<BOARDSIZE; i++ ){
-        target->board[i] = board[i];
-        target->frozen_board[i] = frozen_board[i];
-    }
-    */
-    //for( int i=0; i<PAST_STATE_SIZE; i++ ){
-    //target->past_boards[i] = past_boards[i];
-    //}
     //TODO: do we every use the past actions besides the most recent?
-    memcpy( target->past_actions, past_actions, NUM_PAST_STATES*sizeof(int) );
+    //memcpy( target->past_actions, past_actions, NUM_PAST_STATES*sizeof(int) );
+    target->past_action = past_action;
     memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
-    /*
-    for( int i=0; i<NUM_PAST_STATES; i++ ){
-        //target->past_players[i] = past_players[i];
-        target->past_actions[i] = past_actions[i];
-        target->past_zhashes[i] = past_zhashes[i];
-    }
-    */
 
-    open_intersections.copyInto( &(target->open_intersections) );
 }
 
-//no need for copyInto and copy
+//TODO: redundant, fix whatever is calling it to use copyInto
 void* GoStateStruct::copy(){
     GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
     this->copyInto(s);
     return (void*) s;
-    /*
-    for( int i=0; i<BOARDSIZE; i++ ){
-        s->board[i] = board[i];
-        s->frozen_board[i] = frozen_board[i];
-    }
-
-    s->num_open = num_open;
-    s->player = player;
-    s->action = action;
-
-    for( int i=0; i<PAST_STATE_SIZE; i++){
-        s->past_boards[i] = past_boards[i];
-    }
-    for( int i=0; i<NUM_PAST_STATES; i++ ){
-        s->past_players[i] = past_players[i];
-        s->past_actions[i] = past_actions[i];
-    }
-    return (void*) s;*/ 
 };
 
 char GoStateStruct::flipColor( char c ){
@@ -157,56 +111,55 @@ char GoStateStruct::flipColor( char c ){
     return (c == WHITE) ? BLACK : WHITE;
 }
 
-bool GoStateStruct::sameAs( char* other_board, char player ){
-    if( player != player ){
-        return false;
-    }
-    else{
-        for( int i=0; i < BOARDSIZE; i++ ){
-            if( board[i] != other_board[i] ){
-                return false;
-            }
-        }
-        return true;
-    }
-}
-
-//bool GoStateStruct::sameAs( GoStateStruct* gss2 ){
-//return sameAs( gss2->board, gss2->player );
-//}
-
 void GoStateStruct::togglePlayer() {
     (player == WHITE) ? player = BLACK : player = WHITE;
 }
 
 string GoStateStruct::boardToString( char* board ){
-    string out;
+    stringstream out;
+    out << "   ";
+    for( int i=0; i<BIGDIM; i++){
+        out << i+1;
+        if( i+1 >= 10 ){
+           out << " ";
+        }
+        else{
+            out << "  ";
+        }
+    }
+    out << "\n 0 ";
+    //out += ss.str();
     for( int i=0; i<BOARDSIZE; i++ ){
-        if(      board[i] == BLACK    ){ out += "x"; }
-        else if( board[i] == WHITE    ){ out += "o"; }
-        else if( board[i] == OFFBOARD ){ out += "_"; }
-        else if( board[i] == EMPTY    ){ out += "."; }
+        if(      board[i] == BLACK    ){ out << "x"; }
+        else if( board[i] == WHITE    ){ out << "o"; }
+        else if( board[i] == OFFBOARD ){ out << "_"; }
+        else if( board[i] == EMPTY    ){ out << "."; }
         else{   
             printf( "offending pos is %d, %c\n", i, board[i] );
             assert(false); }
 
-        out += " ";
+        out << "  ";
         if( i % BIGDIM == BIGDIM-1 ){
-            out += "\n";
+            out << "\n";
+            int row = i/BIGDIM+1;
+            if( row >= 10 ){
+                out << "";
+            }
+            else{
+                out << " ";
+            }
+            out << row << " ";
         }
     }
-    return out;
+    return out.str();
 }
 
 string GoStateStruct::toString(){
     string out;
-
     stringstream ss;
     ss << "Player: " << player << endl;
     out += ss.str();
-    
     out += boardToString( board );
-    
     ss << "Action : " << action << endl;
     ss << "Num open: " << num_open << endl;
     out += ss.str();
@@ -232,13 +185,7 @@ int GoStateStruct::neighbor( int ix, DIRECTION dir){
 }
 
 int GoStateStruct::ix2action( int ix, char player ){
-    int parity;
-    if( player == WHITE ){
-        parity = 1;
-    }
-    else{
-        parity = -1;
-    }
+    int parity = player == WHITE ? 1 : -1;
     return ix * parity;
 }
 
@@ -281,13 +228,11 @@ void GoStateStruct::setBoard( int ix, char color ){
     if( color == EMPTY ){ 
         zhash = zhasher->updateHash( zhash, ix, incumbant_color );
         num_open++; 
-        //open_intersections.set( ix, true );
     } 
     else{ 
         //assert( board[ix] == EMPTY ); 
         zhash = zhasher->updateHash( zhash, ix, color );
         num_open--; 
-        //open_intersections.set( ix, false );
     } 
     board[ix] = color; 
 }
@@ -335,6 +280,7 @@ void GoStateStruct::neighborsOf2( int* to_fill, int* to_fill_len,
         }
     }
     else{
+        //TODO fill in for 8
     }
     *to_fill_len = fillix;
 }
@@ -372,39 +318,30 @@ void GoStateStruct::filterByColor(
 }
 
 bool GoStateStruct::floodFill2(  
-        //BitMask* connected_to_lib
-        //BitMask* marked, 
                 int epicenter_ix,
                 int adjacency,
                 char flood_color,
                 char stop_color ){
 
-    //on_queue.clear(); //initBitMask();
-    queue.clear(); //initQueue();
+    queue.clear(); 
     marked.clear();
 
     //cout << "epicenter: " << epicenter_ix << endl;
     queue.push( epicenter_ix );
-    //connected_to_lib.set( epicenter_ix, true );
     marked.set( epicenter_ix, true );
     
-    //int neighbs[adjacency];
     bool stop_color_not_encountered = true;
-
     while( !queue.isEmpty() ){
         int ix = queue.pop();
-        //marked->set( ix, true);
  
         //find if there are neighbors that cause flood fill to stop
         int filtered_len = 0;
-
         neighborsOf2( internal_filtered_array,
                       &filtered_len,
                       ix, adjacency, stop_color );
 
         bool stop_color_is_in_neighbs = filtered_len > 0;
         if( stop_color_is_in_neighbs ){
-            //cout << "stop color in neighbs" << endl;
             stop_color_not_encountered = false;
             break;
         }
@@ -418,18 +355,13 @@ bool GoStateStruct::floodFill2(
                           &filtered_len,
                           ix, adjacency, flood_color );
             
-            //see if connector neighbors are already in marked
-            //if not, add them
-            //assert( filtered_len <= 4 );
             for( int faix=0; faix < filtered_len; faix++ ){
                 int nix = internal_filtered_array[faix];
                 //cout << "same color neighb of: " << ix << " : " << nix << endl;
-                if( /*!marked->get( ix) &&*/ !marked.get( nix) ){
+                if( !marked.get( nix) ){
                     //cout << "pushing: " << nix << " on queue" << endl;
                     queue.push(nix);
                     marked.set( nix,true);
-                    //will clear this if turns out no libs
-                    //connected_to_lib.set( ix, true );
                 }
             }
         }
@@ -516,55 +448,34 @@ bool GoStateStruct::floodFill(
 bool GoStateStruct::isSuicide( int action ){
     char color = action2color( action );
     int ix = action2ix( action );
-    //cout << "ix: " << ix << endl;
     int adjacency = 4;
+    char opp_color = flipColor( color );
 
     neighborsOf( neighbor_array, ix, adjacency );
 
+    //check for the most obvious suicide
+    bool surrounded_by_enemy = true;
+    char ncolor;
+
+    //identify same color neighbors, place in filtered_array
+    int filtered_len = 0;
+    for( int i=0; i<adjacency; i++ ){
+        ncolor = board[ neighbor_array[i] ];
+        surrounded_by_enemy &= ( ncolor == opp_color || ncolor == OFFBOARD );
+        if( ncolor == color ){
+            filtered_array[ filtered_len++ ] = neighbor_array[i];
+        }
+    }
+
+    if( surrounded_by_enemy ){ return true; } 
     
-    //same colored neighbors
-    char colors[1] = {color};
-    int filtered[ADJ_PLUS_ONE];
-    int filtered_len;
-    filterByColor( filtered, &filtered_len,
-                   neighbor_array, adjacency,
-                   colors, 1 );
-    //add the origial ix to the filtered array
-    filtered[filtered_len] = ix;
-    filtered_len++;
-
-
     //floodfill each neighbor stopping if an adjacent EMPTY is found
     //If one of the groups has no liberties, the move is illegal
     //(Remember space making opponent captures have already been applied)
     bool left_with_no_liberties = false;
-    //BitMask marked;
-    char stop_array[1] = {EMPTY};
     for( int i=0; i < filtered_len; i++ ){
-        int nix = filtered[i];
-        //cout << "nix: " << nix << endl;
-        //if( marked.get( nix ) ){ continue; }
-        //if( connected_to_lib.get( nix ) ){ continue; }
-
-        //int flood_len = 0;
-        bool fill_completed = 
-            floodFill2( nix, adjacency, color, EMPTY );
-        //cout << "nix: " << nix << " fill compl: " << fill_completed << endl;
-        //floodFill( floodfill_array, &flood_len,
-        //nix,
-        //adjacency,
-        //colors, 1,
-        //stop_array, 1 );
-
-        /*
-        if( fill_completed ){
-            for( int j=0; j < flood_len; j++ ){
-                //cout << "marking: " << floodfill_array[j] << endl;
-                //marked.insert( floodfill_array[j] );
-                marked.set( floodfill_array[j], true );
-            }
-        }*/
-        //cout << "nix: " << nix << "no_liber: " << (flood_len > 0) << endl;
+        int nix = filtered_array[i];
+        bool fill_completed = floodFill2( nix, adjacency, color, EMPTY );
         left_with_no_liberties |= fill_completed;
     }
                     
@@ -575,55 +486,25 @@ bool GoStateStruct::isDuplicatedByPastState(){
     for( int i=NUM_PAST_STATES-1; i>=0; i-- ){
         if( zhash == past_zhashes[i] ){ return true; }
     }
-    /*
-    for( int i=NUM_PAST_STATES-1; i>=0; i-- ){
-        int past_player = ((NUM_PAST_STATES-1)-i % 2 == 0) ? WHITE : BLACK;
-        int offset = i*BOARDSIZE;
-        //int end = begin+BOARDSIZE-1;
-        if( sameAs( &past_boards[offset], past_players[i] ) ){
-            return true;
-        }
-    }*/
     return false;
 }
 
-//void GoStateStruct::advancePastStates( GoStateStruct* newest_past_state ){
-void GoStateStruct::advancePastStates( int past_zhash, //char* past_board, 
-                                        //char past_player,
+void GoStateStruct::advancePastStates( int past_zhash,  
                                        int past_action ){
-    /*
-    //memcpy?
-    int c = PAST_STATE_SIZE-BOARDSIZE;
-    //shift last i-1 boards over one
-    for( int i=0; i<c; i++ ){
-        past_boards[i] = past_boards[i+BOARDSIZE];
-    }
-    //fill in vacant end spots with the latest board (past_board)
-    for( int i=c; i<PAST_STATE_SIZE; i++ ){
-        //printf("%d : %c\n", i-c, past_board[i-c]);
-        past_boards[i] = past_board[i-c];
-    }
-    */
-
+    //TODO: how to faster?  can't use memcpy on overlapping regions, 
+    //cant use memmove on cuda
+    //memmove( past_zhashes, &past_zhashes[1], 
+    //this->zhasher->sizeOf()*(NUM_PAST_STATES-1) ); 
     for( int i=0; i<NUM_PAST_STATES-1; i++ ){
         past_zhashes[i] = past_zhashes[i+1];
-        //past_players[i] = past_players[i+1];
-        past_actions[i] = past_actions[i+1];
     }
     past_zhashes[NUM_PAST_STATES-1] = past_zhash;
-    //past_players[NUM_PAST_STATES-1] = past_player;
-    past_actions[NUM_PAST_STATES-1] = past_action;
+    this->past_action = past_action;
     
 }
 
 bool GoStateStruct::applyAction( int action,
                                  bool side_effects ){
-
-
-    //cout << "ix: " <<  action << endl;
-    //assert( action >= 0 );
-    //cout << state->toString() << endl;
-
     bool legal = true;
     bool board_frozen = false;
 
@@ -635,10 +516,6 @@ bool GoStateStruct::applyAction( int action,
     action = ix2action( ix, color);
 
     if( ! isPass(action) ){
-        //assert( state->action2color(action) == state->player );
-        //char color = state->action2color(action);
-        //cout << "setting: " << ix << endl;
-
         int adjacency = 4;
         neighborsOf( neighbor_array, ix, adjacency );
         bool surrounded_by_kin = true;
@@ -648,6 +525,7 @@ bool GoStateStruct::applyAction( int action,
             surrounded_by_kin &= ncolor == color || ncolor == OFFBOARD;
             no_opp_color_neighbors &= ncolor != opp_color;
         }
+        //easy legal=true shortcircuit
         if( no_opp_color_neighbors && !surrounded_by_kin ){
             setBoard( ix, color );
             legal = true;
@@ -664,20 +542,24 @@ bool GoStateStruct::applyAction( int action,
             neighborsOf2( filtered_array, &opp_len, 
                           ix, adjacency, opp_color );
 
+            //as we explored the opp_color neighbors of the recently placed
+            //piece, we will mark which stones have liberties.
+            //That way, if we are investigating the second neighbor and it
+            //runs into stones of the first that have a lib, we can short
+            //circuit
             connected_to_lib.clear();
             for( int onix=0; onix < opp_len; onix++ ){
                 marked.clear();
-                bool fill_completed =
-                    floodFill2( 
-                        filtered_array[onix],
-                        adjacency,
-                        opp_color,
-                        EMPTY );
+                bool fill_completed = floodFill2( filtered_array[onix],
+                                                  adjacency,  
+                                                  opp_color, 
+                                                  EMPTY );
                 if( fill_completed ){
                     connected_to_lib.clear();
                     capture( &marked );
                 }
                 else {
+                    //add the marked stones into the ones with liberties
                     connected_to_lib.Or( marked );
                 }
             }
@@ -685,7 +567,9 @@ bool GoStateStruct::applyAction( int action,
                 legal = false;
             }
         }
-        legal &= !isDuplicatedByPastState();
+        if( legal ){
+            legal &= !isDuplicatedByPastState();
+        }
     }
     else{
         //PASS played
@@ -718,16 +602,14 @@ bool GoStateStruct::applyAction( int action,
 }
 
 //return an unsigned action, i.e an ix in the board
+//TODO: implement a la the __host__ version, perhaps with common base function
 __device__
 int GoStateStruct::randomAction( curandState* globalState,
                   int tid,  //tid really blockId, we are changing code
                   BitMask* to_exclude,
                   bool side_effects ){
-    //cout << "inside randomAction" << endl;
-    //GoStateStruct* state = (GoStateStruct*) uncast_state;
-    //int size = num_open; //state->open_positions.size();
+    return 123456789;
     int empty_ixs[ BOARDSIZE /*size*/  ];
-    //cout << "size: " << size << endl;
 
     int i = 0;
     int j;
@@ -815,56 +697,6 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
         return PASS;
     }
 
-}
-
-//pick a random position, and iterate until the first empty found
-//if legal, 
-//  if non-excluded : apply/return
-//  else : note that there is a legal move left
-//else, keep iterating
-//  this time check exclusion before legality
-//if you reach original start, stop
-//  if legal move was excluded : return EXLCUDED
-//  else : return pass
-//
-//  ah shit this isn't actually random, consider:
-//  xxxxxxxxxxxxxxxx__xxxxxxxxxxxxxxx
-//  the left empty spot will be chosen almost all the time
-//  TODO: take the trick with the legal_but_excluded and apply to truly random version
-int GoStateStruct::smarterRandomAction( BitMask* to_exclude,
-                                        bool side_effects ){
-   
-    bool legal_but_excluded_move_available = false;
-    int ix = rand() % BOARDSIZE;
-    cout << "random ix: " << ix << endl;
-    for( int iter=0; iter<BOARDSIZE; iter++ ){
-        if( board[ix] == EMPTY ){
-            bool ix_is_excluded = to_exclude->get(ix);
-            if( legal_but_excluded_move_available ){
-                if( ! ix_is_excluded ){
-                    bool is_legal = applyAction( ix, side_effects );
-                    if( is_legal ){
-                        return ix;
-                    }
-                }
-            }
-            else{
-                bool is_legal = applyAction( ix, side_effects );
-                if( is_legal ){
-                    if( ix_is_excluded ){
-                        legal_but_excluded_move_available = true;
-                    }
-                    else{
-                        return ix;
-                    }
-                }
-            }
-        }
-        //ring increment
-        if( ++ix >= BOARDSIZE ){ ix = 0; }
-    }
-    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
-    else { return PASS; }
 }
 
 __host__
@@ -969,11 +801,76 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
 
 bool GoStateStruct::isTerminal(){
     bool r = action == PASS && 
-             past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
+             past_action == PASS;
+        //past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
     return r;
 }
 
  void GoStateStruct::getRewards( int* to_fill ){
+    int white_score = 0;
+    int black_score = 0;
+    for( int ix=0; ix < BOARDSIZE; ix++ ){
+        if( board[ix] == OFFBOARD ){
+            continue;
+        }
+        if( board[ix] == WHITE ){
+            white_score++;
+            continue;
+        }
+        if( board[ix] == BLACK ){
+            black_score++;
+            continue;
+        }
+
+        //find if ix has a neighbors of {WHITE,EMPTY} or {BLACK,EMPTY}
+        //if so, set ncolor to be WHITE or BLACK
+        //       set nix to be the ix of one such stone
+        //else, the ix is not anybody's territory
+        //char ncolor;
+        //int nix;
+        //
+
+        int adjacency = 4;
+        //int neighbs[adjacency];
+        neighborsOf( neighbor_array,
+                     ix,
+                     adjacency );
+        int* white_neighbs = filtered_array;
+        //int white_neighbs[adjacency];
+        int num_white_neighbs = 0;
+        char filter_colors[1] = {WHITE};
+        filterByColor( white_neighbs, &num_white_neighbs,
+                       neighbor_array, adjacency, 
+                       filter_colors, 1 );
+
+        //int black_neighbs[adjacency];
+        int* black_neighbs = internal_filtered_array;
+        int num_black_neighbs = 0;
+        filter_colors[0] = BLACK;
+        filterByColor( black_neighbs, &num_black_neighbs,
+                       neighbor_array, adjacency,
+                       filter_colors, 1 );
+
+        bool has_white = num_white_neighbs > 0;
+        bool has_black = num_black_neighbs > 0;
+        if(      has_white && ! has_black ) { white_score++; }
+        else if( has_black && ! has_white ) { black_score++; }
+
+    }
+    white_score *= 2;
+    black_score *= 2;
+    white_score += 11; //5.5*2
+
+    to_fill[0] = white_score > black_score ? 1 : 0;
+    to_fill[1] = black_score > white_score ? 1 : 0;
+    //to_fill[0] = white_score;
+    //to_fill[1] = black_score;
+    //cout << "end getRewards" << endl;
+    return;
+}
+
+/*
+ void GoStateStruct::getRewardsComplete( int* to_fill ){
     //TODO use state's bitmask
     BitMask marked; //( state->boardsize );
 
@@ -996,6 +893,7 @@ bool GoStateStruct::isTerminal(){
         //if so, set ncolor to be WHITE or BLACK
         //       set nix to be the ix of one such stone
         //else, the ix is not anybody's territory
+        //
         //char ncolor;
         //int nix;
 
@@ -1022,11 +920,10 @@ bool GoStateStruct::isTerminal(){
 
         bool has_white = num_white_neighbs > 0;
         bool has_black = num_black_neighbs > 0;
-        if(      has_white && ! has_black ) { white_score++; /*ncolor = WHITE;*/ }
-        else if( has_black && ! has_white ) { black_score++; /*ncolor = BLACK;*/ }
-        //else                                { ncolor = EMPTY; }
+        if(      has_white && ! has_black ) { ncolor = WHITE; }
+        else if( has_black && ! has_white ) { ncolor = BLACK; }
+        else                                { ncolor = EMPTY; }
 
-        /*
         //set nix to the first neighbor of the char ncolor
         for( int j=0; j<adjacency; j++ ){
             nix = neighbor_array[j];
@@ -1063,7 +960,7 @@ bool GoStateStruct::isTerminal(){
                     //else{ assert(false); }
                 }
             }
-        }*/
+        }
     }
     white_score *= 2;
     black_score *= 2;
@@ -1076,7 +973,7 @@ bool GoStateStruct::isTerminal(){
     //cout << "end getRewards" << endl;
     return;
 }
-
+*/
 /////////////////////////////////////////////////////////////////////////////
 //                     BitMask.cu
 /////////////////////////////////////////////////////////////////////////////
@@ -1087,9 +984,6 @@ BitMask::BitMask(){
 
 void BitMask::copyInto( BitMask* target ){
     memcpy( target->masks, masks, BITMASK_SIZE*sizeof(int) );
-    //for( int i=0; i<BITMASK_SIZE; i++ ){
-    //bm->masks[i] = masks[i];;
-    //}
     target->count = count;
 }
 
@@ -1177,9 +1071,10 @@ bool Queue::isEmpty(){
 //             Zobrist
 ////////////////////////////////////////////////////////////////////////////
 
+//TODO 64 bit impl
 __host__
 void ZobristHash::ctor(){
-    //B,W,E
+    int_bits = 32;
     for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
         values[ix] = rand();
     }
@@ -1193,9 +1088,6 @@ void ZobristHash::ctor(){
 
 void ZobristHash::copyInto( ZobristHash* target ){
     memcpy( target->values, values, NUM_ZOBRIST_VALUES*sizeof(int) );
-    //for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
-    //target->values[ix] = values[ix];
-    //}
 }
 
 int ZobristHash::getValue( char color, int ix ){
@@ -1210,6 +1102,8 @@ int ZobristHash::getValue( char color, int ix ){
 int ZobristHash::updateHash( int hash, int position, char color ){
     return hash ^ getValue( color, position );
 }
+
+int ZobristHash::sizeOf(){ return int_bits; }
 
 ////////////////////////////////////////////////////////////////////////////
 //             Kernels
@@ -1258,16 +1152,6 @@ __global__ void checkShit( int* member_values, int size, int* results ){
         results[i] = member_values[i] + 42;
     }
 }
-
-/*
-__global__ void reconstruct( void** pointers, int* results ){
-    int tid = blockIdx.x;
-    __shared__ simplestruct ss;
-    SimpleClass sc( pointers );
-    results[tid] = sc.number;
-    //do something with sc and put it int results
-}
-*/
 
 __global__ void leafSim( GoStateStruct* gss,
                          ZobristHash* zh,
@@ -1372,10 +1256,12 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
 
         //For histogram of game lengths
+        /*
         int iteration_counts[MAX_MOVES];
         for( int i=0; i<MAX_MOVES; i++ ){
             iteration_counts[i] = 0;
         }
+        */
 
         //count the number of wins for each side
         for( int i=0; i<NUM_SIMULATIONS; i++ ){
