@@ -1,3 +1,31 @@
+2/19/13
+
+To generate 64 bit randoms for Zobrist hashing:  
+http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/VERSIONS/C-LANG/mt19937-64.c
+
+randomAction still taking the longest time.  There should be a way to leverage empty_intersections across calls.  (for that matter, empty_intersections should be declared and allocated in .h file anyway, start by making this change anyway. use int8_t)
+Then, if nothing is captured by move placement, can reuse empty_intersections and board_ix.  
+Else, add the captured (now empty) ixs that have a lower index than the empty pos that was swapped and returned (the new captures that appear after will be gotten to when we need to)
+
+This should be mega faster
+
+Also, put isSuicide inline into applyAction, doesn't get called anywhere else and should be able to reduce the number of neighbor calls
+
+--------------------
+
+Implemented new eye logic per fred's email
+
+uncovered bug, not sure if related, where enemy won't play single spot surrounded by opp color even though it will capture
+##fixed
+
+on a related note, say white filled the board except for one spot.  if black played there it would capture.  how can we avoid this?
+
+==============================================================================================
+
+some edits got lost here?
+
+===============================================================
+
 2/9/13
 
 The most time is now spent in random action, presumable iterating through the entire board and randomly shuffling it before testing legality is slow.  Have sped up 2x by being lazy about the Fisher-Yates in-place shuffle.  That is, we generate a random number between 0 and num_empty.  If this falls outside the range of empty values discovered in board, we need to iterate through the board some more add find more empties.  Once we have enough, do the swap and test for legality.  If it fails, we iterate on the empty array with the just failed intersection chopped off the end.  But now, when we generate a rand, it is more likely to fall within our range.  This way, the expected number of positions we need to iterate through on the board, as well as the number of rands and swaps we need to do, is reduced because we stop doing it once an acceptable intersection is found.
