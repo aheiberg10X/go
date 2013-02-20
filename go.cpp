@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <iostream>
 #include <time.h>
+#include <stdint.h>
 
 using namespace std;
 
@@ -22,6 +23,8 @@ int main(){
     //cout << sizeof(char) << endl;
     cout << sizeof(bool) << endl;
     cout << sizeof(GoStateStruct) << endl;
+    cout << sizeof(uint8_t) << endl;
+    cout << sizeof(uint64_t) << endl;
     //cout << PAST_STATE_SIZE << endl;
     
 
@@ -40,6 +43,7 @@ int main(){
         int rewards[2];
         launchSimulationKernel( gss, rewards );
     }
+
     
 
     //play a full MCTS game
@@ -64,24 +68,22 @@ int main(){
         }
         
     }
-    /*
-    GoStateStruct state;
-    int bi[9] = {1,1,2,2,2,2,3,3,4};
-    int bj[9] = {2,3,1,2,3,4,3,4,3};
-    int wi[3] = {3,3,4};
-    int wj[3] = {1,2,2};
-    for( int i=0; i<9; i++ ){
-        state.setBoard( state.coord2ix( bi[i], bj[i] ), BLACK );
-    }
-    for( int i=0; i<3; i++ ){
-        state.setBoard( state.coord2ix( wi[i], wj[i] ), WHITE );
-    }
 
-    cout << state.toString() << endl;
-    BitMask empty;
-    int action = state.randomAction( &empty );
-    cout << action << endl;
-    */
+    if( false ){
+        
+        GoStateStruct* gss = new GoStateStruct;
+        gss->ctor(zh);
+        int wi[3] = {1,2,2};
+        int wj[3] = {2,1,2};
+        for( int i=0; i<3; i++ ){
+            gss->setBoard( gss->coord2ix( wi[i], wj[i] ), WHITE );
+        }
+
+        cout << gss->toString() << endl;
+        BitMask empty;
+        int action = gss->randomAction( &empty, true );
+        cout << gss->toString() << endl;
+    }
 
    
     

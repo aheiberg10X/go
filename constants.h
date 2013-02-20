@@ -7,7 +7,7 @@
 #define USE_GPU false
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 20000
+#define NUM_SIMULATIONS 2000
 #define NUM_THREADS 4 
 
 //How many itertions of MCTS before best move selected?
@@ -17,7 +17,7 @@
 
 //GoStateStruct Constants
 //set these
-#define DIMENSION 19 
+#define DIMENSION 7 
 
 //Leave these alone
 #define BIGDIM (DIMENSION+2)
