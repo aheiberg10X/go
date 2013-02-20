@@ -117,6 +117,9 @@ struct GoStateStruct{
     __device__ __host__
     void capture( BitMask* bm );
 
+    __device__ __host__ 
+    bool isBorder( int ix );
+
     __device__ __host__
     void neighborsOf( int* to_fill, int ix, int adjacency );
 

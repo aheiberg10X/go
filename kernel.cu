@@ -166,24 +166,6 @@ string GoStateStruct::toString(){
     return out;
 }
 
-int GoStateStruct::neighbor( int ix, DIRECTION dir){
-    if( board[ix] == OFFBOARD ){
-        return OFFBOARD;
-    }
-    else{
-        if(      dir == N ){  return ix - BIGDIM; }
-        else if( dir == S ){  return ix + BIGDIM; }
-        else if( dir == E ){  return ix + 1;}
-        else if( dir == W ){  return ix -1; }
-        else if( dir == NW ){ return ix - BIGDIM - 1; }
-        else if( dir == NE ){ return ix - BIGDIM + 1; }
-        else if( dir == SW ){ return ix + BIGDIM - 1; }
-        else {//if( dir == SE ){ 
-            return ix + BIGDIM + 1;
-        }
-    }
-}
-
 int GoStateStruct::ix2action( int ix, char player ){
     int parity = player == WHITE ? 1 : -1;
     return ix * parity;
@@ -256,40 +238,95 @@ void GoStateStruct::capture( BitMask* bm ){
     }
 }
 
+bool GoStateStruct::isBorder( int ix ){
+    if( BIGDIM < ix && ix < 2*BIGDIM-1 ){ return true; }
+    else if( ix % BIGDIM == 1 ){return true; }
+    else if( ix % BIGDIM == BIGDIM-2 ){ return true; }
+    else if( BIGDIM*(BIGDIM-2) < ix && ix < BIGDIM*(BIGDIM-1)-1 ){return true;}
+    else{ return false; }
+}
+
 void GoStateStruct::neighborsOf2( int* to_fill, int* to_fill_len,
                                   int ix, int adjacency,
                                   char filter_color ){
     if( board[ix] == OFFBOARD ){ return; }
     int fillix = 0;
-    if( adjacency == 4 ){
-        //N
-        if( board[ix-BIGDIM] == filter_color  ){ 
-            to_fill[fillix++] = ix-BIGDIM;
-        }
-        //S
-        if( board[ix+BIGDIM] == filter_color ){
-            to_fill[fillix++] = ix+BIGDIM;
-        }
-        //E
-        if( board[ix+1] == filter_color ){
-            to_fill[fillix++] = ix+1;
-        }
-        //W
-        if( board[ix-1] == filter_color ){
-            to_fill[fillix++] = ix-1;
-        }
+    //N
+    if( board[ix-BIGDIM] == filter_color  ){ 
+        to_fill[fillix++] = ix-BIGDIM;
     }
-    else{
-        //TODO fill in for 8
+    //S
+    if( board[ix+BIGDIM] == filter_color ){
+        to_fill[fillix++] = ix+BIGDIM;
+    }
+    //E
+    if( board[ix+1] == filter_color ){
+        to_fill[fillix++] = ix+1;
+    }
+    if( board[ix-1] == filter_color ){  //W
+        to_fill[fillix++] = ix-1;
+    }
+    if( adjacency == 8 ){
+        //NW
+        if( board[ix-BIGDIM-1] == filter_color  ){ 
+            to_fill[fillix++] = ix-BIGDIM-1;
+        }
+        //NE
+        if( board[ix-BIGDIM+1] == filter_color ){
+            to_fill[fillix++] = ix-BIGDIM+1;
+        }
+        //SW
+        if( board[ix+BIGDIM-1] == filter_color ){
+            to_fill[fillix++] = ix+BIGDIM-1;
+        }
+        //SE
+        if( board[ix+BIGDIM+1] == filter_color ){
+            to_fill[fillix++] = ix+BIGDIM+1;
+        }
     }
     *to_fill_len = fillix;
 }
 
+int GoStateStruct::neighbor( int ix, DIRECTION dir){
+    if( board[ix] == OFFBOARD ){
+        return OFFBOARD;
+    }
+    else{
+        if(      dir == N ){  return ix - BIGDIM; }
+        else if( dir == S ){  return ix + BIGDIM; }
+        else if( dir == E ){  return ix + 1;}
+        else if( dir == W ){  return ix -1; }
+        else if( dir == NW ){ return ix - BIGDIM - 1; }
+        else if( dir == NE ){ return ix - BIGDIM + 1; }
+        else if( dir == SW ){ return ix + BIGDIM - 1; }
+        else {//if( dir == SE ){ 
+            return ix + BIGDIM + 1;
+        }
+    }
+}
+/* deprecated because slow 
 void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
     //assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
         to_fill[dir] = neighbor( ix, (DIRECTION) dir);
     }                        
+}
+*/
+
+void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
+    if( board[ix] == OFFBOARD ){
+        memset( to_fill, OFFBOARD, adjacency );
+    }
+    to_fill[0] = ix - BIGDIM;
+    to_fill[1] = ix + BIGDIM;
+    to_fill[2] = ix + 1;
+    to_fill[3] = ix - 1;
+    if( adjacency == 8 ){
+        to_fill[4] = ix - BIGDIM - 1;
+        to_fill[5] = ix - BIGDIM + 1;
+        to_fill[6] = ix + BIGDIM - 1;
+        to_fill[7] = ix + BIGDIM + 1;
+    }
 }
 
 void GoStateStruct::filterByColor( 
@@ -516,22 +553,48 @@ bool GoStateStruct::applyAction( int action,
     action = ix2action( ix, color);
 
     if( ! isPass(action) ){
-        int adjacency = 4;
+        int adjacency = 8;
         neighborsOf( neighbor_array, ix, adjacency );
-        bool surrounded_by_kin = true;
-        bool no_opp_color_neighbors = true;
-        for( int i=0; i<adjacency; i++ ){
-            int ncolor = ix2color( neighbor_array[i] );
-            surrounded_by_kin &= ncolor == color || ncolor == OFFBOARD;
-            no_opp_color_neighbors &= ncolor != opp_color;
+        bool orthogonal_all_kin = true;
+        bool no_orthogonal_opps = true;
+        bool lt2_diag_opps, no_diag_opps;
+        bool ix_is_border = isBorder(ix);
+
+        int ncolor;
+        int n_diagonal_opps = 0;
+        //NSEW (orthogonal) neighbs
+        for( int i=0; i<4; i++ ){
+            ncolor = ix2color( neighbor_array[i] );
+            orthogonal_all_kin &= ncolor == color || ncolor == OFFBOARD;
+            no_orthogonal_opps &= ncolor != opp_color;
         }
-        //easy legal=true shortcircuit
-        if( no_opp_color_neighbors && !surrounded_by_kin ){
-            setBoard( ix, color );
-            legal = true;
+        for( int i=4; i<adjacency; i++ ){
+            ncolor = ix2color( neighbor_array[i] );
+            if( ncolor == opp_color ){
+                n_diagonal_opps++;
+            }
         }
-        else if( surrounded_by_kin ){
-            legal = false;
+        lt2_diag_opps = n_diagonal_opps < 2;
+        no_diag_opps = n_diagonal_opps == 0;
+        
+        //various short-circuits to avoid floodFill
+        if( no_orthogonal_opps ){
+            if( orthogonal_all_kin ){
+                if ( ix_is_border && no_diag_opps || 
+                    !ix_is_border && lt2_diag_opps ) {
+                    //this is an eye
+                    legal = false;
+                }
+                else{
+                    legal = true;
+                }
+            }
+            else{
+                legal = true;
+            }
+            if( legal && side_effects ){
+                setBoard( ix, color );
+            }
         }
         else{  //must check for captures
             freezeBoard();
@@ -539,9 +602,9 @@ bool GoStateStruct::applyAction( int action,
 
             setBoard( ix, color );
             int opp_len = 0;
+            adjacency = 4;
             neighborsOf2( filtered_array, &opp_len, 
                           ix, adjacency, opp_color );
-
             //as we explored the opp_color neighbors of the recently placed
             //piece, we will mark which stones have liberties.
             //That way, if we are investigating the second neighbor and it
@@ -563,6 +626,8 @@ bool GoStateStruct::applyAction( int action,
                     connected_to_lib.Or( marked );
                 }
             }
+            //TODO inline suicide here, have it so we are not asking for the
+            //neighbors over and over again
             if( isSuicide( action ) ){
                 legal = false;
             }
@@ -702,6 +767,15 @@ int GoStateStruct::randomActionBase( BitMask* to_exclude,
 __host__
 int GoStateStruct::randomAction( BitMask* to_exclude, 
                                  bool side_effects ){
+    //TODO
+    //should be a way to use empty_intersections across calls to randomAction
+    //for example, if nothing captured after placement, we can use the 
+    //existing empty_ints and board_ix counter
+    //even better, if the earliest capture is after the current ix in begin,
+    //we can reuse.  
+    //but if the capture happens inside of the interval we have already filled
+    //we need to start over
+
     //stores the empty positions we come across in board
     //filled from right to left
     int empty_intersections[num_open];
@@ -713,6 +787,7 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
 
     //board_ix tracks our progress through board looking for empty intersections
     int board_ix, num_needed, num_found;
+    board_ix = 0;
     while( end >= 0 ){
         r = rand() % (end+1);
         //we want to swap the rth and end_th empty intersections.
@@ -987,11 +1062,11 @@ void BitMask::copyInto( BitMask* target ){
     target->count = count;
 }
 
-
 void BitMask::clear(){
-    for( int i=0; i<BITMASK_SIZE; i++ ){
-        masks[i] = 0;
-    }
+    memset( masks, 0, sizeof masks );
+    //for( int i=0; i<BITMASK_SIZE; i++ ){
+    //masks[i] = 0;
+    //}
     count = 0;
 }
 
@@ -1326,9 +1401,9 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
                 t2b = clock();
                 trand_avg += t2b-t2;
 
-                //printf( "%s\n\n", linear->toString().c_str() );
-                //cout << "hit any key..." << endl;
-                //cin.ignore();
+                printf( "%s\n\n", linear->toString().c_str() );
+                cout << "hit any key..." << endl;
+                cin.ignore();
                 
                 t3b = clock();
                 tappl_avg += t3b-t3;
