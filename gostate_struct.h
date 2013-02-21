@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "queue.h"
 #include "bitmask.h"
+#include "bitmask2.h"
 #include "zobrist.h"
 
 #include <cuda.h>
@@ -15,6 +16,7 @@
 #include <string>
 #include <sstream>
 #include <assert.h>
+#include <stdint.h>
 
 using namespace std;
 
@@ -52,8 +54,13 @@ struct GoStateStruct{
 
     //data structure for floodFill
     BitMask marked;
+    BitMask2 marked2;
     BitMask connected_to_lib;
     Queue queue;
+
+    //
+    uint16_t empty_intersections[MAX_EMPTY];
+    uint16_t frozen_empty_intersections[MAX_EMPTY];
 
     __host__
     void ctor( ZobristHash* zh);
@@ -189,6 +196,9 @@ struct GoStateStruct{
 
     __host__ 
     int randomAction( BitMask* to_exclude, bool side_effects );
+    
+    __host__ 
+    int randomAction2( BitMask* to_exclude, bool side_effects );
 
     __host__ __device__
     int randomActionBase( BitMask* to_exclude, bool side_effects, int* empty_ixs);

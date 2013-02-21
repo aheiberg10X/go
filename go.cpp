@@ -47,7 +47,6 @@ int main(){
     
 
     //play a full MCTS game
-    //needs rework with zobrist hashes and whatnot
     if( false ){
         Domain* domain = (Domain*) new GoDomain();
         GoStateStruct* gs = new GoStateStruct;
