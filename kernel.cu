@@ -25,7 +25,6 @@ inline void __checkCudaErrors(cudaError err, const char *file, const int line )
       printf("Error at %s:%d\n",__FILE__,__LINE__);            \
       return EXIT_FAILURE;}} while(0)
 
-
 const int num_elems = 10;
 //generate a random number for the ind'th block
 __device__ float generate( curandState* globalState, int ind ){
@@ -96,14 +95,11 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     memcpy( target->empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
     memcpy( target->frozen_empty_intersections, frozen_empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
 
-    //TODO: do we every use the past actions besides the most recent?
-    //memcpy( target->past_actions, past_actions, NUM_PAST_STATES*sizeof(int) );
     target->past_action = past_action;
     memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
 
 }
 
-//TODO: redundant, fix whatever is calling it to use copyInto
 void* GoStateStruct::copy(){
     GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
     this->copyInto(s);
@@ -372,20 +368,21 @@ void GoStateStruct::filterByColor(
     *to_fill_len = fillix;
 }
 
-bool GoStateStruct::floodFill2(  
+//returns true if the stop color wasn't found, when flooding 'flood_color' 
+//starting from 'epicenter_ix'
+//fills this->marked BitMask with the stones marked
+bool GoStateStruct::floodFill(  
                 int epicenter_ix,
                 int adjacency,
                 char flood_color,
                 char stop_color ){
 
     queue.clear(); 
-    //marked.clear();
-    marked2.clear();
+    marked.clear();
 
     //cout << "epicenter: " << epicenter_ix << endl;
     queue.push( epicenter_ix );
-    //marked.set( epicenter_ix, true );
-    marked2.set( epicenter_ix, true );
+    marked.set( epicenter_ix, true );
     
     bool stop_color_not_encountered = true;
     while( !queue.isEmpty() ){
@@ -416,129 +413,16 @@ bool GoStateStruct::floodFill2(
             for( int faix=0; faix < filtered_len; faix++ ){
                 int nix = internal_filtered_array[faix];
                 //cout << "same color neighb of: " << ix << " : " << nix << endl;
-                //if( !marked.get( nix) ){
-                if( !marked2.get( nix) ){
+                if( !marked.get( nix) ){
                     //cout << "pushing: " << nix << " on queue" << endl;
                     queue.push(nix);
-                    //marked.set( nix,true);
-                    marked2.set( nix,true);
+                    marked.set( nix,true);
                 }
             }
         }
     }
 
     return stop_color_not_encountered;
-}
-
-/*
-bool GoStateStruct::floodFill(  
-                int* to_fill,
-                int* to_fill_len,
-                int epicenter_ix,
-                int adjacency,
-                char* flood_color_array,
-                int filter_len,
-                char* stop_color_array,
-                int stop_len ){
-
-    marked.clear(); //initBitMask();
-    on_queue.clear(); //initBitMask();
-    queue.clear(); //initQueue();
-
-    queue.push( epicenter_ix );
-    
-    //int neighbs[adjacency];
-    bool stop_color_not_encountered = true;
-
-    while( !queue.isEmpty() ){
-        int ix = queue.pop();
-        marked.set( ix, true);
- 
-        neighborsOf( internal_neighbor_array, 
-                     ix, 
-                     adjacency );
-
-        //find if there are neighbors that cause flood fill to stop
-        int filtered_len = 0;
-        filterByColor( internal_filtered_array,
-                       &filtered_len,
-                       internal_neighbor_array,
-                       adjacency,
-                       stop_color_array,
-                       stop_len);
-
-        bool stop_color_is_in_neighbs = filtered_len > 0;
-        if( stop_color_is_in_neighbs ){
-            stop_color_not_encountered = false;
-            break;
-        }
-        else {
-            //find connected neighbors
-            filterByColor( internal_filtered_array,
-                           &filtered_len,
-                           internal_neighbor_array,
-                           adjacency,
-                           flood_color_array,
-                           filter_len );
-            //see if connector neighbors are already in marked
-            //if not, add them
-            //assert( filtered_len <= 4 );
-            for( int faix=0; faix < filtered_len; faix++ ){
-                int ix = internal_filtered_array[faix];
-                if( !marked.get( ix) && !on_queue.get( ix) ){
-                    queue.push(ix);
-                    on_queue.set( ix,true);
-                }
-            }
-        }
-    }
-
-    //populate to_fill; kinda of unnecassay just did to keep use pattern same
-    int i = 0;
-    for( int j=0; j<BOARDSIZE; j++ ){
-        if( marked.get( j ) ){
-            to_fill[i++] = j;
-        }
-    }
-    *to_fill_len = i;
-
-    return stop_color_not_encountered;
-}*/
-
-bool GoStateStruct::isSuicide( int action ){
-    char color = action2color( action );
-    int ix = action2ix( action );
-    int adjacency = 4;
-    char opp_color = flipColor( color );
-
-    neighborsOf( neighbor_array, ix, adjacency );
-
-    //check for the most obvious suicide
-    bool surrounded_by_enemy = true;
-    char ncolor;
-
-    //identify same color neighbors, place in filtered_array
-    int filtered_len = 0;
-    for( int i=0; i<adjacency; i++ ){
-        ncolor = board[ neighbor_array[i] ];
-        surrounded_by_enemy &= ( ncolor == opp_color || ncolor == OFFBOARD );
-        if( ncolor == color ){
-            filtered_array[ filtered_len++ ] = neighbor_array[i];
-        }
-    }
-
-    if( surrounded_by_enemy ){ return true; } 
-    
-    //floodfill each neighbor stopping if an adjacent EMPTY is found
-    //If one of the groups has no liberties, the move is illegal
-    //(Remember space making opponent captures have already been applied)
-    for( int i=0; i < filtered_len; i++ ){
-        int nix = filtered_array[i];
-        bool fill_completed = floodFill2( nix, adjacency, color, EMPTY );
-        if( fill_completed ) { return true; }
-    }
-                    
-    return false;
 }
 
 bool GoStateStruct::isDuplicatedByPastState(){
@@ -577,6 +461,8 @@ bool GoStateStruct::applyAction( int action,
     if( ! isPass(action) ){
         int adjacency = 8;
         neighborsOf( neighbor_array, ix, adjacency );
+
+        //will go through all neighbors and set these booleans appropriately
         bool orthog_all_kin = true;
         bool no_orthog_opps = true;
         bool lt2_diag_opps, no_diag_opps;
@@ -585,19 +471,19 @@ bool GoStateStruct::applyAction( int action,
         bool has_lib = false;
 
         int ncolor;
-        int n_diagonal_opps = 0;
         //NSEW (orthog) neighbs
         for( int i=0; i<4; i++ ){
-            //ncolor = ix2color( neighbor_array[i] );
-            ncolor = board[ neighbor_array[i] ];
+            ncolor = ix2color( neighbor_array[i] );
             has_lib |= ncolor == EMPTY;
             orthog_all_kin &= ncolor == color || ncolor == OFFBOARD;
             no_orthog_opps &= ncolor != opp_color;
-            surrounded_by_enemy &= ( ncolor == opp_color || ncolor == OFFBOARD );
+            surrounded_by_enemy &= ncolor == opp_color || ncolor == OFFBOARD;
         }
+
+        //diagonal neighbs
+        int n_diagonal_opps = 0;
         for( int i=4; i<adjacency; i++ ){
-            //ncolor = ix2color( neighbor_array[i] );
-            ncolor = board[ neighbor_array[i] ];
+            ncolor = ix2color( neighbor_array[i] );
             if( ncolor == opp_color ){
                 n_diagonal_opps++;
             }
@@ -626,6 +512,8 @@ bool GoStateStruct::applyAction( int action,
             adjacency = 4;
             neighborsOf2( filtered_array, &len, 
                           ix, adjacency, opp_color );
+            //deprecated, seems overhead didn't make the short-circuit worth it
+            //TODO: test more thoroughly on 19x19 though
             //as we explored the opp_color neighbors of the recently placed
             //piece, we will mark which stones have liberties.
             //That way, if we are investigating the second neighbor and it
@@ -635,7 +523,7 @@ bool GoStateStruct::applyAction( int action,
             bool capture_made = false;
             for( int onix=0; onix < len; onix++ ){
                 marked.clear();
-                bool fill_completed = floodFill2( filtered_array[onix],
+                bool fill_completed = floodFill( filtered_array[onix],
                                                   adjacency,  
                                                   opp_color, 
                                                   EMPTY );
@@ -651,23 +539,21 @@ bool GoStateStruct::applyAction( int action,
             }
             
             //check suicide
-            //if a capture is made, the new place and all friends it is
-            //connected to has one liberty by def
-            //else we must check that 
             if( !capture_made ){
                 if( surrounded_by_enemy ){ legal = false; } 
                 else {
                     if( !has_lib ) {
-                         //identify same color neighbors, place in filtered_array
-                        
-                        //floodfill each neighbor stopping if an adjacent EMPTY is found
-                        //If one of the groups has no liberties, the move is illegal
-                        //(Remember space making opponent captures have already been applied)
+                        //floodFill each same color neighb
+                        //if one reaches the end without finding liberty
+                        //return legal=false
                         neighborsOf2( filtered_array, &len, 
                                       ix, adjacency, color );
                         for( int i=0; i < len; i++ ){
                             int nix = filtered_array[i];
-                            bool fill_completed = floodFill2( nix, adjacency, color, EMPTY );
+                            bool fill_completed = floodFill( nix, 
+                                                             adjacency, 
+                                                             color, 
+                                                             EMPTY );
                             if( fill_completed ) { 
                                 legal = false;
                                 break; 
@@ -676,8 +562,11 @@ bool GoStateStruct::applyAction( int action,
                     }
                 }
             }
-            
-           
+            else{
+                //if a capture is made, the newly placed stone and all friends 
+                //it is connected to has one liberty by def
+                //else we must check that 
+            }
         }
         if( legal ){
             legal &= !isDuplicatedByPastState();
@@ -687,7 +576,7 @@ bool GoStateStruct::applyAction( int action,
         //PASS played
     }
     
-    //cout << "legal" << legal << endl;
+    //do we apply, or rollback?
     if( legal ){
         if( side_effects ){
             //cout << "legal and side effects" <<endl;
@@ -868,18 +757,15 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     }
 }
 
+//DEPRECATED
+//pre the empty_intersection days
+//a nice lazy approach to Fischer-Yates shuffle and empty ix iteration
+//keeping because conceived and implement so cleanly
+//will delete eventually
+/*
 __host__
 int GoStateStruct::randomAction2( BitMask* to_exclude, 
                                  bool side_effects ){
-    //TODO
-    //should be a way to use empty_intersections across calls to randomAction
-    //for example, if nothing captured after placement, we can use the 
-    //existing empty_ints and board_ix counter
-    //even better, if the earliest capture is after the current ix in begin,
-    //we can reuse.  
-    //but if the capture happens inside of the interval we have already filled
-    //we need to start over
-
     //stores the empty positions we come across in board
     //filled from right to left
     //int empty_intersections[num_open];
@@ -948,22 +834,19 @@ int GoStateStruct::randomAction2( BitMask* to_exclude,
         end--;
     }
 
-
     if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
     else { 
         applyAction( PASS, side_effects );
         return PASS;
     }
 }
+*/
 
 bool GoStateStruct::isTerminal(){
-    bool r = action == PASS && 
-             past_action == PASS;
-        //past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
-    return r;
+    return action == PASS && past_action == PASS;
 }
 
- void GoStateStruct::getRewards( int* to_fill ){
+void GoStateStruct::getRewards( int* to_fill ){
     int white_score = 0;
     int black_score = 0;
     for( int ix=0; ix < BOARDSIZE; ix++ ){
@@ -1026,6 +909,8 @@ bool GoStateStruct::isTerminal(){
     return;
 }
 
+//will need to rework this if ever use playouts where it is not the case that 
+//only single empty positions are left
 /*
  void GoStateStruct::getRewardsComplete( int* to_fill ){
     //TODO use state's bitmask
@@ -1131,10 +1016,14 @@ bool GoStateStruct::isTerminal(){
     return;
 }
 */
+
 /////////////////////////////////////////////////////////////////////////////
 //                     BitMask.cu
 /////////////////////////////////////////////////////////////////////////////
 // OMFG just just use a bool[] ?
+// Have deprecated the old,smaller but slower BitMask into bitmask_small.h
+// This is it's impl, just not renamed yet
+/*
 BitMask::BitMask(){
     clear();
 }
@@ -1180,32 +1069,29 @@ void BitMask::Or( BitMask bm ){
         masks[i] |= bm.masks[i];
     }
 }
-
+*/
 
 ////////////////////
 
-BitMask2::BitMask2(){
+BitMask::BitMask(){
     clear();
 }
 
-void BitMask2::copyInto( BitMask2* target ){
+void BitMask::copyInto( BitMask* target ){
     memcpy( target->mask, mask, BOARDSIZE*sizeof(bool) );
     target->count = count;
 }
 
-void BitMask2::clear(){
+void BitMask::clear(){
     memset( mask, false, BOARDSIZE );
-    //for( int i=0; i<BITMASK_SIZE; i++ ){
-    //masks[i] = 0;
-    //}
     count = 0;
 }
 
-void BitMask2::set(int bit, bool value ) {
+void BitMask::set(int bit, bool value ) {
     mask[bit] = value;
 }
 
-bool BitMask2::get( int bit ){
+bool BitMask::get( int bit ){
     return mask[bit];
 }
 
@@ -1223,9 +1109,6 @@ Queue::Queue(){
 }
 
 void Queue::clear(){
-    //for( int i=0; i<BOARDSIZE; i++){
-    //array[i] = -1;
-    //}
     begin = 0;
     end = 0;
     nElems = 0;
@@ -1240,16 +1123,14 @@ void Queue::push( int a ){
 
 int Queue::pop(){
     int r = array[begin];
-    //array[begin] = -1;
     begin = ringInc(begin);
     nElems--;
     return r;
 }
 
 bool Queue::isEmpty(){
-    return nElems == 0; //begin == end && array[end] == -1;
+    return nElems == 0; 
 }
-
 
 ////////////////////////////////////////////////////////////////////////////
 //             Zobrist
@@ -1494,7 +1375,7 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         trand_avg = 0;
         tappl_avg = 0;
         trewd_avg = 0;
-        int total_move_count = 0;
+        //int total_move_count = 0;
         for( int i=0; i<NUM_SIMULATIONS; i++ ){
             t1 = clock();
             GoStateStruct* linear = (GoStateStruct*) gss->copy();

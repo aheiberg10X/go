@@ -6,7 +6,7 @@
 #include <cuda_runtime.h>
 
 struct BitMask {
-    int masks[BITMASK_SIZE];
+    bool mask[BOARDSIZE];
     int count;
 
     __device__ __host__ BitMask();
@@ -18,11 +18,8 @@ struct BitMask {
 
     __device__ __host__ bool get( int bit );
     
-    __device__ __host__ void Or( BitMask bm );
-
     __device__ __host__ void copyInto( BitMask* bm );
 
 };
-
 
 #endif

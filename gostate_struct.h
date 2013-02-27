@@ -5,7 +5,6 @@
 #include "constants.h"
 #include "queue.h"
 #include "bitmask.h"
-#include "bitmask2.h"
 #include "zobrist.h"
 
 #include <cuda.h>
@@ -27,7 +26,6 @@ struct GoStateStruct{
     int action;
     int num_open;
     char player;
-
 
     //storage space for current board when checking move legality
     char frozen_board[BOARDSIZE];
@@ -54,7 +52,6 @@ struct GoStateStruct{
 
     //data structure for floodFill
     BitMask marked;
-    BitMask2 marked2;
     BitMask connected_to_lib;
     Queue queue;
 
@@ -143,33 +140,11 @@ struct GoStateStruct{
                         char* color_array,
                         int filter_len );
 
-
-    /*
     __device__ __host__
-    bool floodFill(  
-                    int* to_fill,
-                    int* to_fill_len,
-                    int epicenter_ix,
-                    int adjacency,
-                    char* flood_color_array,
-                    int filter_len,
-                    char* stop_color_array,
-                    int stop_len );*/
-
-    __device__ __host__
-    bool floodFill2( 
-            /*int* to_fill,*/
-            /*int* to_fill_len,*/
-            /*BitMask* connected_to_*/
-            /*BitMask* flooded, */
-                    int epicenter_ix,
+    bool floodFill (int epicenter_ix,
                     int adjacency,
                     char flood_color,
                     char stop_color );
-
-
-    __device__ __host__
-    bool isSuicide( int action );
 
     __device__ __host__
     void freezeBoard( char* target );
@@ -181,12 +156,8 @@ struct GoStateStruct{
     bool isDuplicatedByPastState();
 
     __device__ __host__
-    void advancePastStates( int past_zhash, //char* past_board,
-            /*char past_player,*/
+    void advancePastStates( int past_zhash, 
                             int past_action );
-
-    /*__device__ __host__ */
-    /*bool isNaivelyLegal( int ix, char COLOR );*/
 
     __device__ __host__ 
     bool applyAction( int action, bool side_effects );
@@ -197,9 +168,6 @@ struct GoStateStruct{
     __host__ 
     int randomAction( BitMask* to_exclude, bool side_effects );
     
-    __host__ 
-    int randomAction2( BitMask* to_exclude, bool side_effects );
-
     __host__ __device__
     int randomActionBase( BitMask* to_exclude, bool side_effects, int* empty_ixs);
 
