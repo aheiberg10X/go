@@ -1,39 +1,7 @@
-#include <stdio.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <curand.h>
-#include <curand_kernel.h>
-#include <time.h>
-
 #include "gostate_struct.h"
 #include "kernel.h"
-#include "godomain.cpp"
-#include "zobrist.h"
 
-// This will output the proper CUDA error strings in the event that a CUDA host call returns an error 
-#define checkCudaErrors(err)  __checkCudaErrors (err, __FILE__, __LINE__) 
-inline void __checkCudaErrors(cudaError err, const char *file, const int line ) 
-{ 
-    if(cudaSuccess != err) 
-    { 
-        fprintf(stderr, "%s(%i) : CUDA Runtime API error %d: %s.\n",file, line, (int)err, cudaGetErrorString( err ) ); 
-        exit(-1);         
-    } 
-}
 
-#define CURAND_CALL(x) do { if((x) != CURAND_STATUS_SUCCESS) { \
-      printf("Error at %s:%d\n",__FILE__,__LINE__);            \
-      return EXIT_FAILURE;}} while(0)
-
-const int num_elems = 10;
-//generate a random number for the ind'th block
-__device__ float generate( curandState* globalState, int ind ){
-    //int tid = blockIdx.x;
-    curandState localState = globalState[ind];
-    float rnd = curand_uniform( &localState );
-    globalState[ind] = localState;
-    return rnd;
-}
 //////////////////////////////////////////////////////////////////////////////
 //                     GoStructState.cu
 /////////////////////////////////////////////////////////////////////////////
@@ -218,7 +186,10 @@ void GoStateStruct::setBoard( int ix, char color ){
         //look through and find ix in empty_intersections. Swap with last
         //empty, then decrement num_open, effectively removing this ix
         //from the list of empties
-        if( ! empty_intersections[num_open-1] == ix ){
+        //cout << "setboard " << ix << endl;
+        //cout << "last in empyt: " << empty_intersections[num_open-1] << endl;
+        if( empty_intersections[num_open-1] != ix ){
+            //cout << "looking to remove ix: " << ix << endl;
             for( int i=num_open-2; i >= 0; i-- ){
                 if( empty_intersections[i] == ix ){
                     //cout << "found swap out in: " << num_open-i << " moves" << endl;
@@ -457,7 +428,6 @@ bool GoStateStruct::applyAction( int action,
     char color = player;
     char opp_color = flipColor(color); 
     action = ix2action( ix, color);
-
     if( ! isPass(action) ){
         int adjacency = 8;
         neighborsOf( neighbor_array, ix, adjacency );
@@ -495,13 +465,25 @@ bool GoStateStruct::applyAction( int action,
                                          (!ix_is_border && lt2_diag_opps)  );
         bool no_orthog_opps_and_liberty = no_orthog_opps && has_lib;
         if( is_eye ){
+            //cout << "is eye" << endl;
             legal = false;
         }
         else if( no_orthog_opps_and_liberty ){
             legal = true;
-            if( legal && side_effects ){
+            //cout << "easy place, zhash: " << zhash << endl;
+            if( legal ){
+                //rather than do full fledged freeze/thaw,  
+                //maintain the old color in case this placement causes ko
+                char old_color = ix2color(ix);
                 setBoard( ix, color );
+                //cout << "intermediate zhash: " << zhash << endl;
+                legal = !isDuplicatedByPastState();
+                //cout << "duplicated: " << legal << endl;
+                if( !legal || !side_effects ){
+                    setBoard( ix, old_color );
+                }
             }
+            //cout << "easy place end, legal: " << legal << " zhash: " << zhash << endl;
         }
         else{  //must check for captures
             freezeBoard();
@@ -540,7 +522,10 @@ bool GoStateStruct::applyAction( int action,
             
             //check suicide
             if( !capture_made ){
-                if( surrounded_by_enemy ){ legal = false; } 
+                if( surrounded_by_enemy ){ 
+                    legal = false;
+                    //cout << "surround by enemy" << endl;
+                } 
                 else {
                     if( !has_lib ) {
                         //floodFill each same color neighb
@@ -556,6 +541,7 @@ bool GoStateStruct::applyAction( int action,
                                                              EMPTY );
                             if( fill_completed ) { 
                                 legal = false;
+                                //cout << "no lib left" << endl;
                                 break; 
                             }
                         }
@@ -567,10 +553,14 @@ bool GoStateStruct::applyAction( int action,
                 //it is connected to has one liberty by def
                 //else we must check that 
             }
+            //after done looking for and applying captures, check superko
+            if( legal ){
+                //cout << "cur zhash: " << zhash << endl;
+                legal &= !isDuplicatedByPastState();
+                //cout << "dup by past state" << legal << endl;
+            }
         }
-        if( legal ){
-            legal &= !isDuplicatedByPastState();
-        }
+        
     }
     else{
         //PASS played
@@ -602,111 +592,18 @@ bool GoStateStruct::applyAction( int action,
     }  
 }
 
-//return an unsigned action, i.e an ix in the board
-//TODO: implement a la the __host__ version, perhaps with common base function
-__device__
-int GoStateStruct::randomAction( curandState* globalState,
-                  int tid,  //tid really blockId, we are changing code
-                  BitMask* to_exclude,
-                  bool side_effects ){
-    return 123456789;
-    int empty_ixs[ BOARDSIZE /*size*/  ];
-
-    int i = 0;
-    int j;
-    //can shuffle randomly as we insert...
-    for( int ix=0; ix<BOARDSIZE; ix++ ){
-        //cout << "random shuffle i: " << i << endl;
-        if( board[ix] == EMPTY ){
-            if( i == 0 ){
-                empty_ixs[0] = ix;
-            }
-            else{
-                //j = rand() % i;
-                j = (int) ( generate(globalState,tid) * i );
-                empty_ixs[i] = empty_ixs[j];
-                empty_ixs[j] = ix;
-            }
-            i++;
-        }
-    }
-    //cout << "after shuffled" << endl;
-    //
-    return randomActionBase( to_exclude, side_effects, empty_ixs );
-
-    /*
-    //try each one to see if legal
-    bool legal_moves_available = false;
-    int candidate;
-    for( int j=0; j<size; j++ ){
-        candidate = empty_ixs[j];
-        bool is_legal = applyAction( candidate, false );
-        if( is_legal ){
-            legal_moves_available = true;
-            if( !to_exclude->get( candidate ) ){
-                return candidate;
-            }
-        }
-    }
-
-    if( legal_moves_available ){ //but all were excluded...
-        return EXCLUDED_ACTION;
-    }
-    else {
-        return PASS;
-    }*/
-}
-
-__host__ __device__
-int GoStateStruct::randomActionBase( BitMask* to_exclude,
-                                     bool side_effects,
-                                     int* empty_ixs
-                                    ){
-    //try each one to see if legal
-    //bool legal_moves_available = false;
-    bool legal_but_excluded_move_available = false;
-    for( int j=0; j<num_open; j++ ){
-        int ix = empty_ixs[j];
-        //cout << "candidatae: "<< ix << endl;
-        bool ix_is_excluded = to_exclude->get(ix);
-        if( legal_but_excluded_move_available ){
-            if( ! ix_is_excluded ){
-                bool is_legal = applyAction( ix, side_effects );
-                if( is_legal ){
-                    //cout << "num tried until legal1: " << j << endl;
-                    return ix;
-                }
-            }
-        }
-        else{
-            bool is_legal = applyAction( ix, side_effects );
-            if( is_legal ){
-                if( ix_is_excluded ){
-                    legal_but_excluded_move_available = true;
-                }
-                else{
-                    //cout << "num tried until legal: " << j << endl;
-                    return ix;
-                }
-            }
-        }
-    }
-    
-    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
-    else { 
-        applyAction( PASS, side_effects );
-        return PASS;
-    }
-
-}
-
-__host__ 
 int GoStateStruct::randomAction( BitMask* to_exclude,
                                  bool side_effects ){
+    //for( int i=0; i<num_open; i++ ){
+    //cout << empty_intersections[i] << ", ";
+    //}
+    //cout << endl;
     int end = num_open-1;
+    //cout << "num_open: " << num_open << endl;
     int r;
     bool legal_but_excluded_move_available = false;
     while( end >= 0 ){
+        //TODO: rand can generate a 0 move here, PASS when we don't want it
         r = rand() % (end+1);
         
         //swap empty[end] and empty[r]
@@ -722,6 +619,7 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
         //test whether the move legal and not excluded
         //return intersection if so
         int candidate = empty_intersections[num_open-1];
+        //cout << "candidate: " << candidate << endl;
         bool ix_is_excluded = to_exclude->get(candidate);
         if( legal_but_excluded_move_available ){
             if( ! ix_is_excluded ){
@@ -843,7 +741,8 @@ int GoStateStruct::randomAction2( BitMask* to_exclude,
 */
 
 bool GoStateStruct::isTerminal(){
-    return action == PASS && past_action == PASS;
+    bool r = action == PASS && past_action == PASS;
+    return r;
 }
 
 void GoStateStruct::getRewards( int* to_fill ){
@@ -1089,6 +988,9 @@ void BitMask::clear(){
 
 void BitMask::set(int bit, bool value ) {
     mask[bit] = value;
+    if( value ){ count++;}
+    else{        count--;}
+
 }
 
 bool BitMask::get( int bit ){
@@ -1137,7 +1039,6 @@ bool Queue::isEmpty(){
 ////////////////////////////////////////////////////////////////////////////
 
 //TODO 64 bit impl
-__host__
 void ZobristHash::ctor(){
     int_bits = 32;
     for( int ix=0; ix<NUM_ZOBRIST_VALUES; ix++ ){
@@ -1170,256 +1071,62 @@ int ZobristHash::updateHash( int hash, int position, char color ){
 
 int ZobristHash::sizeOf(){ return int_bits; }
 
-////////////////////////////////////////////////////////////////////////////
-//             Kernels
-////////////////////////////////////////////////////////////////////////////
-
-
-__global__ void stochasticSwapper( int* a, 
-                                   int* dev_results, 
-                                   curandState* globalState  ){
-    int tid = blockIdx.x;    // handle the data at this index
-    __shared__ int scratch_space[num_elems];
-
-    //init the shared memory
-    for( int i=0; i<num_elems; i++ ){
-        scratch_space[i] = a[i];
-    }
-
-    //do stuff
-    int times = (int) (generate( globalState, tid ) * num_elems);
-    int rnd1, rnd2, temp;
-    for( int i=0; i<times; i++ ){
-        rnd1 = (int) (generate( globalState, tid ) * num_elems);
-        rnd2 = (int) (generate( globalState, tid ) * num_elems);
-        temp = scratch_space[rnd1];
-        scratch_space[rnd1] = scratch_space[rnd2];
-        scratch_space[rnd2] = temp;
-    }
-    //scratch_space[rnd] = 42;
-    
-
-    //fill the correct row of results
-    for( int i=0; i<num_elems; i++ ){
-        int ix = tid*num_elems + i;
-        dev_results[ix] = scratch_space[i];
-    }
-
-}
-
-__global__ void setupRandomGenerators( curandState* state, unsigned long seed ){
-    int tid = blockIdx.x;
-    curand_init( seed+tid, tid, 0, &state[tid] );
-}
-
-__global__ void checkShit( int* member_values, int size, int* results ){
-    for( int i=0; i<size; i++ ){
-        results[i] = member_values[i] + 42;
-    }
-}
-
-__global__ void leafSim( GoStateStruct* gss,
-                         ZobristHash* zh,
-                         curandState* globalState, 
-                         int* winners,
-                         int* iterations ){
-    int tid = blockIdx.x + threadIdx.x;
-
-    //TODO: still giving __shared__ non-empty constructor warning
-    //because of mem variables like BitMask.  Fix eventually
-    __shared__ GoStateStruct gss_local;
-    __shared__ ZobristHash zhasher_local;
-
-    __syncthreads();
-    if( tid == 0 ){
-        //TODO modify BitMask to fit this paradig,
-        gss->copyInto( &gss_local ); 
-        zh->copyInto( &zhasher_local );
-        gss_local.zhasher = &zhasher_local;
-    }
-    __syncthreads();
-
-    /*
-    winners[tid] = tid+42;
-    if( tid % 2 == 0 ){
-        int num = zhasher_local.updateHash( gss_local.zhash, tid, BLACK );
-        iterations[tid/2] = num; 
-    }
-
-    __syncthreads();*/
-
-    //do if tid == 0 here, race conditions?
-    BitMask to_exclude;
-    int count = 0;
-    while( count < MAX_MOVES && !gss_local.isTerminal() ){
-        int action = gss_local.randomAction( globalState, tid, &to_exclude, true );
-        //bool is_legal = gss_local.applyAction( action, true );
-        count++;
-    }
-
-    iterations[tid] = count;
-    gss_local.getRewards( &(winners[tid*2]) );
-    
-
-}
-
 int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     int white_win = 0;
     int black_win = 0;
-    if( USE_GPU ){
-        //setup rand generators on kernel
-        curandState* devStates;
-        cudaMalloc( &devStates, NUM_SIMULATIONS*sizeof(curandState) );
-        setupRandomGenerators<<<NUM_SIMULATIONS,1>>>( devStates, time(NULL) );
+    int ta = clock();
+    int t1,t1b, tcopy_avg;
+    int t2,t2b, trand_avg;
+    int t3,t3b, tappl_avg;
+    int trewd_avg;
+    tcopy_avg = 0;
+    trand_avg = 0;
+    tappl_avg = 0;
+    trewd_avg = 0;
+    //int total_move_count = 0;
+    for( int i=0; i<NUM_SIMULATIONS; i++ ){
+        t1 = clock();
+        GoStateStruct* linear = (GoStateStruct*) gss->copy();
+         
+        t1b = clock();
+        tcopy_avg += t1b-t1;
+        BitMask to_exclude;
+        int move_count = 0;
+        while( move_count < MAX_MOVES && !linear->isTerminal() ){
+            t2 = clock();
+            int action = linear->randomAction( &to_exclude, true );
 
-        GoStateStruct* dev_gss;
-        cudaMalloc( (void**)&dev_gss, sizeof(GoStateStruct));
-        cudaMemcpy( dev_gss, gss, sizeof(GoStateStruct), cudaMemcpyHostToDevice );
+            t2b = clock();
+            trand_avg += t2b-t2;
 
-        printf( "hash test: %d\n", gss->zhasher->updateHash( gss->zhash, 1, BLACK ) );
-        ZobristHash* dev_zh;
-        cudaMalloc( (void**) &dev_zh, sizeof(ZobristHash) );
-        cudaMemcpy( dev_zh, gss->zhasher, sizeof(ZobristHash), cudaMemcpyHostToDevice );
-        
-        int ta = clock();
-        //printf("time to do memcpys to device: %f s\n", ((float) t)/CLOCKS_PER_SEC);
-
-        int winner_elems = NUM_SIMULATIONS*2;
-        int winners[winner_elems];
-        int* dev_winners;
-        int sizeof_winners = winner_elems*sizeof(int); 
-        cudaMalloc( (void**)&dev_winners, sizeof_winners );
-
-        int iteration_elems = NUM_SIMULATIONS;
-        int iterations[iteration_elems];
-        int* dev_iterations;
-        int sizeof_iterations = iteration_elems*sizeof(int);
-        cudaMalloc( (void**)&dev_iterations, sizeof_iterations );
-
-        //printf("calling kernel\n");
-        
-        //this is the default, setting it to PreferL1 slowed down 3x
-        cudaFuncSetCacheConfig(leafSim, cudaFuncCachePreferShared );
-
-        leafSim<<<NUM_SIMULATIONS, NUM_THREADS>>>
-                                  (dev_gss, 
-                                   dev_zh,                                    
-                                   devStates, 
-                                   dev_winners,
-                                   dev_iterations );
-        cudaThreadSynchronize();
-
-        int t = clock();
-        //printf("kernel return, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-
-        cudaMemcpy( winners, dev_winners, sizeof_winners, 
-                    cudaMemcpyDeviceToHost );
-        cudaMemcpy( iterations, dev_iterations, sizeof_iterations, 
-                    cudaMemcpyDeviceToHost );
-        
-        t = clock();
-        //printf("mem transfer, %f secs\n", ((float)t)/CLOCKS_PER_SEC) ;
-
-        //For histogram of game lengths
-        /*
-        int iteration_counts[MAX_MOVES];
-        for( int i=0; i<MAX_MOVES; i++ ){
-            iteration_counts[i] = 0;
+            //printf( "%s\n\n", linear->toString().c_str() );
+            //cout << "hit any key..." << endl;
+            //cin.ignore();
+            
+            t3b = clock();
+            tappl_avg += t3b-t3;
         }
-        */
+        //cout << "after sim: " << linear->toString() << endl;
 
-        //count the number of wins for each side
-        for( int i=0; i<NUM_SIMULATIONS; i++ ){
-            if( winners[i*2] == 1 ){
-               white_win++;
-            }
-            else if( winners[i*2+1] == 1 ){
-                black_win++;
-            }
-            printf( "White: %d v. Black: %d\n", winners[i*2], winners[i*2+1] );
-            printf( "Took: %d steps\n\n", iterations[i] );
-            printf("%d - %d\n", winners[i*2], winners[i*2+1] );
-            printf("%d\n\n", iterations[i] );
-            //iteration_counts[iterations[i]]++;
-
+        int rewards[2];
+        int t4 = clock();
+        linear->getRewards( rewards );
+        int t4b = clock();
+        trewd_avg += t4b - t4;
+        if( rewards[0] == 1 ){
+            white_win++;
         }
-
-        /*
-        int cdf_sum = 0;
-        for( int i=0; i<MAX_MOVES; i++ ){
-            if( iteration_counts[i] > 0 ){
-                printf( "%d steps : %d\n", i, iteration_counts[i] );
-                cdf_sum += iteration_counts[i];
-                printf( "cdf: %f\n\n", cdf_sum / ((float)NUM_SIMULATIONS) );
-            }
+        else if( rewards[1] == 1 ){
+            black_win++;
         }
-        */
-        cudaFree( dev_gss );
-        cudaFree( dev_zh );
-        cudaFree( dev_winners );
-        cudaFree( dev_iterations );
-        cudaFree( devStates );
-
-        int tb = clock();
-
-        printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-    
+        //printf("rewards[0]: %d, rewards[1]: %d\n", rewards[0], rewards[1] );
     }
-    else{
-        int ta = clock();
-        int t1,t1b, tcopy_avg;
-        int t2,t2b, trand_avg;
-        int t3,t3b, tappl_avg;
-        int trewd_avg;
-        tcopy_avg = 0;
-        trand_avg = 0;
-        tappl_avg = 0;
-        trewd_avg = 0;
-        //int total_move_count = 0;
-        for( int i=0; i<NUM_SIMULATIONS; i++ ){
-            t1 = clock();
-            GoStateStruct* linear = (GoStateStruct*) gss->copy();
-             
-            t1b = clock();
-            tcopy_avg += t1b-t1;
-            BitMask to_exclude;
-            int move_count = 0;
-            while( move_count < MAX_MOVES && !linear->isTerminal() ){
-                t2 = clock();
-                int action = linear->randomAction( &to_exclude, true );
-
-                t2b = clock();
-                trand_avg += t2b-t2;
-
-                //printf( "%s\n\n", linear->toString().c_str() );
-                //cout << "hit any key..." << endl;
-                //cin.ignore();
-                
-                t3b = clock();
-                tappl_avg += t3b-t3;
-            }
-
-            int rewards[2];
-            int t4 = clock();
-            linear->getRewards( rewards );
-            int t4b = clock();
-            trewd_avg += t4b - t4;
-            if( rewards[0] == 1 ){
-                white_win++;
-            }
-            else if( rewards[1] == 1 ){
-                black_win++;
-            }
-            //printf("rewards[0]: %d, rewards[1]: %d\n", rewards[0], rewards[1] );
-        }
-        int tb = clock();
-        printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-        printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
-        printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
-        //printf("avg appl time: %f\n", ((float) tappl_avg)/CLOCKS_PER_SEC);  // /div by total_move_count to get avg
-        printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
-        
-    }
+    int tb = clock();
+    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+    printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
+    printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
+    //printf("avg appl time: %f\n", ((float) tappl_avg)/CLOCKS_PER_SEC);  // /div by total_move_count to get avg
+    printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
 
     //printf( "dev white win count: %d\n", white_win_dev );
     //printf( "host white win count: %d\n", white_win_host );

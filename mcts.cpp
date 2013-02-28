@@ -27,13 +27,18 @@ int MCTS::search( void* root_state ){
     int iterations = 0;
     while( iterations < NUM_ITERATIONS ){
         state = domain->copyState(root_state);
-        //cout << endl << endl << "iteration: " << iterations << endl;
-        //cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
+        cout << endl << endl << "iteration: " << iterations << endl;
+        cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
         node = treePolicy( root_node, state );
         //cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
 
+        //TODO
+        //break in domain/state interface
+        //mcts should assume nothing about the uncast_state and always
+        //go through domain
         launchSimulationKernel( (GoStateStruct*) state, rewards );
+        //cout << "rewards w/b: " << rewards[0] << "/" << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
         iterations += 1; 
@@ -85,10 +90,16 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     int action;
     MCTS_Node* node = root_node;
     BitMask empty_to_exclude;
+    empty_to_exclude.clear();
 
     while( node->marked && !domain->isTerminal( uncast_state ) ){
         action = domain->randomAction( uncast_state, 
                                        &empty_to_exclude );
+        if( abs(action) == abs(((GoStateStruct* ) uncast_state)->action) ){
+            assert(false);
+
+        }
+        cout << "randPol action: " << action << endl;
         domain->applyAction( uncast_state, 
                              action, 
                              true );

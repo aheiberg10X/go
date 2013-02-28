@@ -234,66 +234,6 @@ public :
         bool side_effects = false;
         return ((GoStateStruct*) uncast_state)->randomAction(to_exclude, side_effects);
     }
-    /* 
-    int randomAction( void* uncast_state,
-                      BitMask* to_exclude ){
-        //bool* to_exclude ){
-        //cout << "inside randomAction" << endl;
-        GoStateStruct* state = (GoStateStruct*) uncast_state;
-        //get a random shuffle of the empty intersections
-        //set<int>::iterator it;
-        int size = state->num_open; //state->open_positions.size();
-        int empty_ixs[ BOARDSIZE ];
-        //cout << "size: " << size << endl;
-
-        int i = 0;
-        int j;
-        //can shuffle randomly as we insert...
-        for( int ix=0; ix<BOARDSIZE; ix++ ){
-            //cout << "random shuffle i: " << i << endl;
-            if( state->board[ix] == EMPTY ){
-                if( i == 0 ){
-                    empty_ixs[0] = ix;
-                }
-                else{
-                    //TODO
-                    //replace with device rand
-                    j = rand() % i;
-                    empty_ixs[i] = empty_ixs[j];
-                    empty_ixs[j] = ix;
-                }
-                i++;
-            }
-        }
-        //cout << "after shuffled" << endl;
-
-        //try each one to see if legal
-        bool legal_moves_available = false;
-        int candidate;
-        for( int j=0; j<size; j++ ){
-            candidate = empty_ixs[j];
-            //cout << "legality test begin" << endl;
-            bool is_legal = applyAction( uncast_state, candidate, false );
-            //cout << "legaity test conclude" << endl;
-            //bool is_legal = applyAction( state, candidate, false );
-
-            if( is_legal ){
-                legal_moves_available = true;
-                //if( to_exclude[candidate] == false ){
-                if( !to_exclude->get( candidate ) ){
-                    //return action;
-                    return candidate;
-                }
-            }
-        }
-
-        if( legal_moves_available ){ //but all were excluded...
-            return EXCLUDED_ACTION;
-        }
-        else {
-            return PASS;
-        }
-    }*/
 
     bool fullyExpanded( int action ){
         return action == EXCLUDED_ACTION;

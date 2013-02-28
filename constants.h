@@ -11,7 +11,7 @@
 #define NUM_THREADS 4 
 
 //How many itertions of MCTS before best move selected?
-#define NUM_ITERATIONS 1000
+#define NUM_ITERATIONS 100
 
 #define BALANCING_CONSTANT (1/sqrt(2))
 

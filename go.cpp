@@ -9,6 +9,8 @@
 //just for direct timing/testing launchSimulationKernel
 #include "kernel.h"
 
+#include <omp.h>
+
 #include <assert.h>
 #include <iostream>
 #include <time.h>
@@ -36,7 +38,6 @@ int main(){
     if( true ){
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
-        gss->zhash = 42;
 
         //BitMask* to_exclude = new BitMask;
         //int action = gss->randomAction( to_exclude, false );
@@ -44,27 +45,49 @@ int main(){
         launchSimulationKernel( gss, rewards );
     }
 
-    
-
+    cout << "asdfasd" << endl;
     //play a full MCTS game
     if( false ){
         Domain* domain = (Domain*) new GoDomain();
-        GoStateStruct* gs = new GoStateStruct;
-        void* uncast_state = (void*) gs;
         MCTS mcts(domain);
 
-        while( !domain->isTerminal( uncast_state ) ){
-            int ta = clock();
-            int best_action = mcts.search( uncast_state );
-            int tb = clock();
-            cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
-            cout << "Best Action: " << best_action << endl;
-            domain->applyAction( uncast_state, best_action, true );
-            cout << "Applying action: " << best_action << endl;
-            cout << "Resulting state: " << ((GoStateStruct* ) uncast_state)->toString(  ) << endl;
-            cout << "hit any key..." << endl;
-            cin.ignore();
+        GoStateStruct* gs = new GoStateStruct;
+        gs->ctor(zh);
+        void* uncast_state = (void*) gs;
+
+        int ntrees = 1;
+        int tid;
+        int* best_actions = new int[ntrees];
+        void** uncast_states = new void*[ntrees];
+        //void** MCTSs = new MCTS*[ntrees];
+
+        for( int i=0; i<ntrees; i++ ){
+            uncast_states[i] = domain->copyState( uncast_state );
+            //MCTSs[i] = new MCTS;
+            //MCTSs[i]->domain = domain;
         }
+        #pragma omp parallel shared(uncast_states, best_actions) \
+                             private(tid) \
+                             num_threads(ntrees)
+        {
+            tid = omp_get_thread_num();
+            cout << "hello" << endl;
+            while( !domain->isTerminal( uncast_states[tid] ) ){
+                int ta = clock();
+                                                    
+                best_actions[tid] = mcts.search( uncast_states[tid] );
+                int tb = clock();
+                cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
+                cout << "Best Action: " << best_actions[tid] << endl;
+                domain->applyAction( uncast_states[tid], best_actions[tid], true );
+                cout << "Applying action: " << best_actions[tid] << endl;
+                cout << "Resulting state: " << ((GoStateStruct* ) uncast_states[tid])->toString(  ) << endl;
+                cout << "hit any key..." << endl;
+                cin.ignore();
+            }
+
+        }
+
         
     }
 

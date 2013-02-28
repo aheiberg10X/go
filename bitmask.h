@@ -2,23 +2,21 @@
 #define BITMASK_H
 
 #include "constants.h"
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 struct BitMask {
     bool mask[BOARDSIZE];
     int count;
 
-    __device__ __host__ BitMask();
+    BitMask();
     
     /*void initBitMask();*/
-    __device__ __host__ void clear();
+    void clear();
 
-    __device__ __host__ void set( int bit, bool value );
+    void set( int bit, bool value );
 
-    __device__ __host__ bool get( int bit );
+    bool get( int bit );
     
-    __device__ __host__ void copyInto( BitMask* bm );
+    void copyInto( BitMask* bm );
 
 };
 

@@ -2,8 +2,6 @@
 #define QUEUE
 
 #include "constants.h"
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 struct Queue{
     //int length;
@@ -11,19 +9,17 @@ struct Queue{
     int begin, end;
     int nElems;
 
-    __device__ __host__ Queue();
+    Queue();
 
-    __device__ __host__ int ringInc( int i );
+    int ringInc( int i );
 
-    /*void initQueue();*/
+    void clear();
 
-    __device__ __host__ void clear();
+    void push( int a );
 
-    __device__ __host__ void push( int a );
+    int pop();
 
-    __device__ __host__ int pop();
-
-    __device__ __host__ bool isEmpty();
+    bool isEmpty();
 
 };
 
