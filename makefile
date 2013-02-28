@@ -1,24 +1,39 @@
-CFLAGS=-O3#-pg #--cubin #--ptxas-options=-v #-pg
+CFLAGS= -pg 
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=nvcc 
 
-#all:  clean go
-#all: cleango goonly
 all: clean shared
-#all: clean benchmark
+#all : clean_omp omp
+#all: clean_linktest linktest
+
+######################################################################
+
+omp:
+	g++ omp.cpp -o omp ${CFLAGS}
+
+#######################################################################
+
+linktest: linktest.o
+	g++ -o linktest ComputeValueBoard_binaryFeat linktest.o 
+
+linktest.o :
+	g++ -c linktest.cpp ${CFLAGS}
+
+########################################################################
 
 benchmark: kernel.o 
-	nvcc -o kernel kernel.o ${CFLAGS}
+	${CMPLR} -o kernel kernel.o ${CFLAGS}
 
 shared: kernel.o godomain.o mcts.o go.o
-	nvcc -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o ${CFLAGS}
+	${CMPLR} -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o ${CFLAGS}
 
 kernel.o:
-	nvcc -c kernel.cu ${CFLAGS}
+	${CMPLR} -c kernel.cu ${CFLAGS}
 
 mcts.o : mcts_node.o
 	${CMPLR} -c mcts.cpp ${CFLAGS}
+	#g++ -c mcts.cpp ${CFLAGS}
 
 mcts_node.o: 
 	${CMPLR} -c mcts_node.cpp ${CFLAGS}
@@ -26,14 +41,19 @@ mcts_node.o:
 godomain.o: 
 	${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
 
-#stonestring.o:
-	#g++ -c stonestring.cpp ${CFLAGS}
-
 go.o:
-	${CMPLR} -c go.cpp ${INC} ${CFLAGS}  
+	${CMPLR} -c go.cpp ${INC} ${CFLAGS} 
+
+######################################################################
 
 cleango:
 	rm -f go.o go
+
+clean_omp :
+	rm -f omp omp.o
+
+clean_linktest:
+	rm -f linktest linktest.o
 
 clean:
 	rm -rf *.o go kernel

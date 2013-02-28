@@ -218,7 +218,7 @@ void GoStateStruct::setBoard( int ix, char color ){
         //look through and find ix in empty_intersections. Swap with last
         //empty, then decrement num_open, effectively removing this ix
         //from the list of empties
-        if( ! empty_intersections[num_open-1] == ix ){
+        if( empty_intersections[num_open-1] != ix ){
             for( int i=num_open-2; i >= 0; i-- ){
                 if( empty_intersections[i] == ix ){
                     //cout << "found swap out in: " << num_open-i << " moves" << endl;
@@ -1089,6 +1089,8 @@ void BitMask::clear(){
 
 void BitMask::set(int bit, bool value ) {
     mask[bit] = value;
+    if( value ){ count++; }
+    else{        count--; }
 }
 
 bool BitMask::get( int bit ){
