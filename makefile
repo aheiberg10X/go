@@ -1,4 +1,4 @@
-CFLAGS= -O3 -fopenmp
+CFLAGS= -pg -fopenmp
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=g++ 

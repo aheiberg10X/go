@@ -455,11 +455,11 @@ void GoStateStruct::advancePastStates( int past_zhash,
                                        int past_action ){
     //TODO: how to faster?  can't use memcpy on overlapping regions, 
     //cant use memmove on cuda
-    //memmove( past_zhashes, &past_zhashes[1], 
+    memmove( past_zhashes, &past_zhashes[1], NUM_PAST_STATES-1 ); 
     //this->zhasher->sizeOf()*(NUM_PAST_STATES-1) ); 
-    for( int i=0; i<NUM_PAST_STATES-1; i++ ){
-        past_zhashes[i] = past_zhashes[i+1];
-    }
+    //for( int i=0; i<NUM_PAST_STATES-1; i++ ){
+    //past_zhashes[i] = past_zhashes[i+1];
+    //}
     past_zhashes[NUM_PAST_STATES-1] = past_zhash;
     this->past_action = past_action;
     
