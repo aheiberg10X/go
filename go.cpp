@@ -45,7 +45,6 @@ int main(){
         launchSimulationKernel( gss, rewards );
     }
 
-    cout << "asdfasd" << endl;
     //play a full MCTS game
     if( false ){
         Domain* domain = (Domain*) new GoDomain();
@@ -53,44 +52,71 @@ int main(){
 
         GoStateStruct* gs = new GoStateStruct;
         gs->ctor(zh);
-        void* uncast_state = (void*) gs;
+        //void* uncast_state = (void*) gs;
 
-        int ntrees = 1;
+        int nthreads = 4;
         int tid;
-        int* best_actions = new int[ntrees];
-        void** uncast_states = new void*[ntrees];
-        //void** MCTSs = new MCTS*[ntrees];
+        int best_action;
 
-        for( int i=0; i<ntrees; i++ ){
-            uncast_states[i] = domain->copyState( uncast_state );
-            //MCTSs[i] = new MCTS;
-            //MCTSs[i]->domain = domain;
-        }
-        #pragma omp parallel shared(uncast_states, best_actions) \
-                             private(tid) \
-                             num_threads(ntrees)
-        {
-            tid = omp_get_thread_num();
-            cout << "hello" << endl;
-            while( !domain->isTerminal( uncast_states[tid] ) ){
-                int ta = clock();
-                                                    
-                best_actions[tid] = mcts.search( uncast_states[tid] );
-                int tb = clock();
-                cout << "time taken is: " << ((float) tb-ta)/CLOCKS_PER_SEC << endl;
-                cout << "Best Action: " << best_actions[tid] << endl;
-                domain->applyAction( uncast_states[tid], best_actions[tid], true );
-                cout << "Applying action: " << best_actions[tid] << endl;
-                cout << "Resulting state: " << ((GoStateStruct* ) uncast_states[tid])->toString(  ) << endl;
-                cout << "hit any key..." << endl;
-                cin.ignore();
+        MCTS_Node** search_trees = new MCTS_Node* [nthreads];
+        GoStateStruct** states = new GoStateStruct* [nthreads];
+
+        while( !domain->isTerminal( gs ) ){
+            //initialize each thread's copy of state
+            for( int i=0; i<nthreads; i++ ){
+                states[i] = gs->copy();
             }
 
+            //do parallel tree search
+            #pragma omp parallel for shared(states, search_trees) \
+                                     private(tid) \
+                                     num_threads(nthreads)
+            for(int tid=0; tid<nthreads; tid++){
+                search_trees[tid] = mcts.search( (void*) states[tid] );
+            }
+
+            //aggregate results
+            for( int ix=0; ix<search_trees[0]->num_actions; ix++){
+                //put aggregate results into first thread: search_trees[0]
+                MCTS_Node* agg_child;
+                if( ! search_trees[0]->tried_actions->get(ix) ){
+                    agg_child = new MCTS_Node( search_trees[0], ix );
+                }
+                else{
+                    agg_child = search_trees[0]->children[ix];
+                }
+                
+                for( int tid=0; tid<nthreads; tid++ ){
+                    if( search_trees[tid]->tried_actions->get(ix) ){
+                        MCTS_Node* child = search_trees[tid]->children[ix];
+                        agg_child->total_rewards[0] += child->total_rewards[0];
+                        agg_child->total_rewards[1] += child->total_rewards[1];
+                        agg_child->visit_count += child->visit_count;
+                    }
+                }
+            }
+
+            int pix = domain->getPlayerIx( gs );
+            int best_action = mcts.bestChild( search_trees[0], 
+                                              pix, 
+                                              true )->action;
+
+            cout << "best action for player: " << pix << " is: " << best_action << endl;
+            cout << "hit any key..." << endl;
+            cin.ignore();
+
+            //clean up
+            for( int tid=0; tid<nthreads; tid++ ){
+                delete search_trees[tid];
+            }
+            
+            //apply to uncast_state
+            //assert best_action is legal
+            bool legal = domain->applyAction( gs, best_action, true );
+            assert(legal);
         }
-
-        
     }
-
+    
     if( false ){
         
         GoStateStruct* gss = new GoStateStruct;

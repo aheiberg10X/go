@@ -13,22 +13,27 @@ MCTS::MCTS( Domain* d ){
     domain = d;
 }
 
-//returns an action
-int MCTS::search( void* root_state ){
+//returns the search_tree
+MCTS_Node* MCTS::search( void* root_state ){
     assert( !domain->isChanceAction( root_state ) );
     int num_players = domain->getNumPlayers( root_state );
     int num_actions = domain->getNumActions( root_state );
     MCTS_Node* root_node = new MCTS_Node( num_players, num_actions );
+    //cout << root_node << endl;
+
+    //create a copy of root_state, this will be our scratch space
 
     MCTS_Node* node;
-    void* state;
     int rewards[num_players];
 
     int iterations = 0;
     while( iterations < NUM_ITERATIONS ){
-        state = domain->copyState(root_state);
-        cout << endl << endl << "iteration: " << iterations << endl;
-        cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
+        //cout << "iteration: " << iterations << endl;
+        void* state = domain->copyState( root_state );
+        //cout << "\n\ncopied state: " << ((GoStateStruct*) state)->toString() << endl;
+        //start from the beginning...
+        //cout << endl << endl << "iteration: " << iterations << endl;
+        //cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
         node = treePolicy( root_node, state );
         //cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
@@ -42,35 +47,42 @@ int MCTS::search( void* root_state ){
 
         backprop( node, rewards, num_players );
         iterations += 1; 
+        //cout << "before delete root state zhasher->values[0]: " << ((GoStateStruct* )root_state)->zhasher->values[10] << endl;
         domain->deleteState( state );
+        //cout << "after delete root state zhasher->values[0]: " << ((GoStateStruct* )root_state)->zhasher->values[10] << endl;
+
     }
 
     assert( root_node->is_root );
     
     //print out info on each child for debugging
+    /*
     MCTS_Node* child;
     for( int i=0; i<root_node->num_actions; i++){
         if( root_node->tried_actions->get(i) ){
             child = root_node->children[i];
-            cout << "action: " << i << " EV:";
-            // << child->visit_count << " total_rewards: ";
+            //cout << "action: " << i << " EV:";
+            //<< child->visit_count << " total_rewards: ";
             for( int j=0; j< num_players; j++ ){
                 cout << (double) child->total_rewards[j] / child->visit_count << ", ";
             }
-            cout << endl;
+            //cout << endl;
         }
         else{
-            cout << "didn't try: " << i << endl;
+            //cout << "didn't try: " << i << endl;
         }
-    }
+    }*/
 
+    /*
     int player_ix = domain->getPlayerIx(state);
     MCTS_Node* best_child = bestChild( root_node, player_ix, true );
     int best_action = best_child->action;
+    */
 
-    delete root_node;
+    //delete root_node;
 
-    return best_action;
+    //return best_action;
+    return root_node;
 }
 
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
@@ -95,11 +107,16 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     while( node->marked && !domain->isTerminal( uncast_state ) ){
         action = domain->randomAction( uncast_state, 
                                        &empty_to_exclude );
-        if( abs(action) == abs(((GoStateStruct* ) uncast_state)->action) ){
-            assert(false);
+        //cout << "randPol random action chosen: " << action << endl;
 
-        }
-        cout << "randPol action: " << action << endl;
+        //cout << "state->action : " << ((GoStateStruct* ) uncast_state)->action << endl;
+        //if( abs(action) == abs(((GoStateStruct* ) uncast_state)->action) ){
+        //cout << "randPol action: " << action << endl;
+        //cout << "state->action : " << ((GoStateStruct* ) uncast_state)->action << endl;
+        //assert(false);
+        //
+        //}
+        //cout << "randPol action: " << action << endl;
         domain->applyAction( uncast_state, 
                              action, 
                              true );
@@ -144,15 +161,17 @@ MCTS_Node* MCTS::expand( MCTS_Node* parent,
     return new MCTS_Node( parent, action );
 }
 
-int MCTS::scoreNode( MCTS_Node* node, 
+float MCTS::scoreNode( MCTS_Node* node, 
                      MCTS_Node* parent, 
                      int        player_ix, 
                      bool just_exploitation ){
     int creward = node->total_rewards[player_ix];
     int cvisit = node->visit_count;
     int pvisit = parent->visit_count;
-    double exploitation = creward / ((double) cvisit);
-    double exploration = BALANCING_CONSTANT*sqrt( 2*log(pvisit) / cvisit );
+    //cout << "creward: " << creward << " cvisit: " << cvisit << endl;
+    float exploitation = creward / ((float) cvisit);
+    //cout << "exploitation: " << exploitation << endl;
+    float exploration = BALANCING_CONSTANT*sqrt( 2*log(pvisit) / cvisit );
     if( just_exploitation ){
         return exploitation;
     }
@@ -166,29 +185,39 @@ MCTS_Node* MCTS::bestChild( MCTS_Node* parent,
                             bool just_exploitation ){
     bool uninit = true;
     int max_ix = 0;
-    double max_score = 0;
-    double score;
+    float max_score = -1;
+    float score;
     MCTS_Node* child;
 
-    cout << "player_ix: " << player_ix << endl;
+    int vcount = 0;
+
+    int max_ixs[BOARDSIZE];
+    int max_ixs_len = 0;
+
+    //cout << "player_ix: " << player_ix << endl;
     for( int ix=0; ix < parent->num_actions; ix++ ){
         if( parent->tried_actions->get(ix) ){
             child = parent->children[ix];
+            vcount += child->visit_count;
             score = scoreNode( child, parent, player_ix, just_exploitation );
                 //((double) child->total_rewards[player_ix]) / child->visit_count;
-            if( uninit ){
-                max_ix = ix;
+                //cout << "child action: " << child->action << " score: " << score << endl;
+            if( score > max_score ){
+                max_ixs[0] = ix;
+                max_ixs_len = 1;
                 max_score = score;
-                uninit = false;
             }
-            else{
-                if( score > max_score ){
-                    max_ix = ix;
-                    max_score = score;
-                }
+            else if( score == max_score ){
+                max_ixs[ max_ixs_len++ ] = ix;
             }
+
+
         }
     }
+    int r = rand() % max_ixs_len;
+    max_ix = max_ixs[r];
+    //cout << "vcount: " << vcount << endl;
+    //cout << "max ix: " << max_ix << endl;
     return parent->children[max_ix];
 
 }

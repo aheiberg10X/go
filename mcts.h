@@ -14,7 +14,7 @@ public :
     MCTS( Domain* domain );
 
     //returns an action
-    int search( void* root_state );
+    MCTS_Node* search( void* root_state );
 
     MCTS_Node* treePolicy( MCTS_Node* node, 
                            void*      state );
@@ -33,7 +33,7 @@ public :
                        void*      pstate, 
                        int        action );
 
-    int scoreNode( MCTS_Node* node, 
+    float scoreNode( MCTS_Node* node, 
                    MCTS_Node* parent, 
                    int        player_ix, 
                    bool       just_exploitation );

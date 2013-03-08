@@ -18,6 +18,8 @@ public :
     int num_players;
     int num_actions;
 
+    int avoid_false_sharing[128];
+
     //TODO
     //mem waste to maintain both a tried and action:child map
     //but we want ot be able to give random action a to_exclude list

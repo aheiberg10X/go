@@ -41,10 +41,19 @@ public :
         }
     }
 
-    void* copyState( void* state ){
-        GoStateStruct* gs = (GoStateStruct*) state;
-        return gs->copy();
+    void copyStateInto( void* source, void* target ){
+        GoStateStruct* gs_source = (GoStateStruct*) source;
+        GoStateStruct* gs_target = (GoStateStruct*) target;
+        gs_source->copyInto( gs_target );
     };
+
+    void* copyState( void* source ){
+        GoStateStruct* gs_source = (GoStateStruct*) source;
+        GoStateStruct* gs_target = (GoStateStruct*) malloc(sizeof(GoStateStruct));
+        gs_source->copyInto(gs_target);
+        return (void*) gs_target;
+    }
+
 
     void deleteState( void* state ) {
         free(state);
@@ -55,7 +64,6 @@ public :
                       int action,
                       bool side_effects ){
 
-        //cout << "inside applyAction" << endl;
         assert( action >= 0 );
         GoStateStruct* state = (GoStateStruct*) uncast_state;
         return state->applyAction( action, side_effects );
@@ -67,172 +75,14 @@ public :
                      void* uncast_state ){
         ((GoStateStruct*) uncast_state)->getRewards( to_fill );
     }
-    /*
-    void getRewards( int* to_fill,
-                     void* uncast_state ){
-        //cout << "start getRewards" << endl;
-        GoStateStruct* state = (GoStateStruct*) uncast_state;
-
-        //set<int> marked;
-        BitMask marked; //( state->boardsize );
-        //cout << "ere1" << endl;
-        //int string_id = 0;
-        //ix : stonestring_id
-        //map<int,int> string_lookup;
-        // stonestring_id : StoneString()
-        //map<int,StoneString*> stone_strings;
-
-        //TODO
-        //this building StoneStrings is unnecessary
-        //we just need to go through and look for empty spots that become
-        //territory.  Count them up and then count the stones
-        //for( int ix=0; ix < boardsize; ix++ ){
-            //if( board[ix] == OFFBOARD ||
-                //board[ix] == EMPTY ||
-                //marked.find(ix) != marked.end() ){
-                //continue;
-            //}
-
-            //int floodfill_array[boardsize];
-            //char color = state->ix2color(ix);
-            //char* flood_colors = {color};
-            //char* stop_colors;
-            //int floodfill_len = 0;
-            //state->floodFill( floodfill_array,
-                              //&floodfill_len,
-                              //ix,
-                              //8,
-                              //flood_colors, 1,
-                              //stop_colors,  0 );
-
-            //if( floodfill_len > 0 ){
-                //StoneString* ss = new StoneString( string_id, 
-                                                   //floodfill_array, 
-                                                   //floodfill_len, 
-                                                   //color );
-                //stone_strings[string_id] = ss;
-                //for( int i=0; i < floodfill_len; i++ ){
-                    //int ix = floodfill_array[i];
-                    //marked.insert( ix );
-                    //stonestring_lookup[ix] = string_id;
-                //}
-                //string_id++;
-            //}
-        //}
-        //
-        //marked.clear();
-
-        int white_score = 0;
-        int black_score = 0;
-        for( int ix=0; ix < BOARDSIZE; ix++ ){
-            //cout << "marekd at: " << ix << " : " << marked.get(ix) << endl;
-            //cout << state->board[ix] << endl;
-            if( state->board[ix] == OFFBOARD ||
-                marked.get( ix ) ){
-                    //marked.find(ix) != marked.end() ){
-                continue;
-            }
-            if( state->board[ix] == WHITE ){
-                white_score++;
-                continue;
-            }
-            if( state->board[ix] == BLACK ){
-                black_score++;
-                continue;
-            }
-
-            //find if ix has a neighbors of {WHITE,EMPTY} or {BLACK,EMPTY}
-            //if so, set ncolor to be WHITE or BLACK
-            //       set nix to be the ix of one such stone
-            //else, the ix is not anybody's territory
-            char ncolor;
-            int nix;
-
-            int adjacency = 4;
-            int neighbs[adjacency];
-            state->neighborsOf( neighbs,
-                                ix,
-                                adjacency );
-            int white_neighbs[adjacency];
-            int num_white_neighbs = 0;
-            char filter_colors[1] = {WHITE};
-            state->filterByColor(
-                           white_neighbs, &num_white_neighbs,
-                                  neighbs, adjacency, 
-                                  filter_colors, 1 );
-
-            int black_neighbs[adjacency];
-            int num_black_neighbs = 0;
-            filter_colors[0] = BLACK;
-            state->filterByColor( 
-                                  black_neighbs, &num_black_neighbs,
-                                  neighbs, adjacency,
-                                  filter_colors, 1 );
-
-            bool has_white = num_white_neighbs > 0;
-            bool has_black = num_black_neighbs > 0;
-            if(      has_white && ! has_black ) { ncolor = WHITE; }
-            else if( has_black && ! has_white ) { ncolor = BLACK; }
-            else                                { ncolor = EMPTY; }
-
-            //set nix to the first neighbor of the char ncolor
-            for( int j=0; j<adjacency; j++ ){
-                nix = neighbs[j];
-                if( state->ix2color( nix ) == ncolor ){
-                    break;
-                }
-            }
-
-            if( ncolor == BLACK || ncolor == WHITE ){
-
-                //this is overkill given how we are moving
-                //is enough to just see a color adjacent to an empty
-                //assuming the rest bug free, it will be that colors territory
-                int floodfill_len = 0;
-                char flood_colors[1] = {EMPTY};
-                char stop_colors[1] = {state->flipColor(ncolor)};
-                bool are_territories = 
-                    state->floodFill(  
-                                      state->floodfill_array, &floodfill_len,
-                                      ix, 
-                                      adjacency,
-                                      flood_colors, 1,
-                                      stop_colors, 1 );
-
-                //mark these empty positions regardless of their territory 
-                //status
-                for( int i=0; i<floodfill_len; i++ ){
-                    marked.set( state->floodfill_array[i], true );
-                    //marked.insert( state->floodfill_array[i] );
-                    if( are_territories ){
-                        if( ncolor == WHITE ){
-                            white_score++;
-                        }
-                        else if( ncolor == BLACK ){
-                            black_score++;
-                        }
-                        else{ assert(false); }
-                    }
-                }
-            }
-        }
-        white_score *= 2;
-        black_score *= 2;
-        white_score += 11; //5.5*2
-
-        to_fill[0] = white_score > black_score ? 1 : 0;
-        to_fill[1] = black_score > white_score ? 1 : 0;
-        //cout << "end getRewards" << endl;
-        return;
-    }
-    */
-
+    
     //return an unsigned action, i.e an ix in the board
     //deprecated, in kernel
     int randomAction( void* uncast_state, 
                       BitMask* to_exclude ){
         bool side_effects = false;
-        return ((GoStateStruct*) uncast_state)->randomAction(to_exclude, side_effects);
+        return ((GoStateStruct*) uncast_state)->randomAction( to_exclude, 
+                                                              side_effects);
     }
 
     bool fullyExpanded( int action ){
@@ -246,21 +96,6 @@ public :
     bool isTerminal( void* uncast_state ){
         return ((GoStateStruct*) uncast_state)->isTerminal();
     }
-
-    //deprecated, in knernel 
-    /*
-    bool isTerminal( void* uncast_state ){
-        //cout << "whoa there" << endl;
-        GoStateStruct* state = (GoStateStruct*) uncast_state;
-        //TODO
-        //rework for new abstraction
-        //GoStateStruct* last_state = state->past_states[NUM_PAST_STATES-1];
-        bool r = state->action == PASS && 
-               state->past_actions[NUM_PAST_STATES-1] == PASS; //last_state->action == PASS;
-        //cout << "wtf" << endl;
-        return r;
-    }
-    */
 
 };
 

@@ -58,14 +58,15 @@ struct GoStateStruct{
     uint16_t frozen_empty_intersections[MAX_EMPTY];
 
     void ctor( ZobristHash* zh);
-    
+    /*~GoStateStruct();   */
+
     void freezeBoard();
 
     void thawBoard();
 
     void copyInto( GoStateStruct* target );
 
-    void* copy( );
+    GoStateStruct* copy( );
     
     char flipColor( char c );
 

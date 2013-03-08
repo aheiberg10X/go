@@ -10,6 +10,7 @@ struct Queue{
     int nElems;
 
     Queue();
+    /*~Queue();*/
 
     int ringInc( int i );
 

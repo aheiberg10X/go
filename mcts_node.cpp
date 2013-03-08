@@ -57,14 +57,11 @@ int MCTS_Node::num_nodes_destroyed = 0;
 void MCTS_Node::incCreated(){
     num_nodes_created++;
 }
+
 void MCTS_Node::incDestroyed(){
     num_nodes_destroyed++;
 }
     
-//void MCTS_Node::setNumNodes(){
-//num_nodes = 0;
-//}
-
 MCTS_Node::~MCTS_Node(){
     incDestroyed();
     //cout << "NODE DELETED" << endl;

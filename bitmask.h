@@ -8,6 +8,7 @@ struct BitMask {
     int count;
 
     BitMask();
+    /*~BitMask();*/
     
     /*void initBitMask();*/
     void clear();
@@ -17,6 +18,8 @@ struct BitMask {
     bool get( int bit );
     
     void copyInto( BitMask* bm );
+
+    void Or( BitMask bm );
 
 };
 

@@ -1,6 +1,15 @@
 #include "gostate_struct.h"
 #include "kernel.h"
 
+uint32_t m_z = rand();
+uint32_t m_w = rand();
+uint32_t nextRandom;
+static uint32_t getRandom(uint32_t * m_z, uint32_t * m_w)
+{
+    *m_z = 36969 * (*m_z & 65535) + (*m_z >> 16);
+    *m_w = 18000 * (*m_w & 65535) + (*m_w >> 16);
+    return (*m_z << 16) + *m_w;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 //                     GoStructState.cu
@@ -13,6 +22,7 @@ void GoStateStruct::ctor(ZobristHash* zh){
     frozen_zhash = 0;
     num_open = 0;
     frozen_num_open = 0;
+    //cout << "gss ctor called:" << endl;
     for( int i=0; i<BOARDSIZE; i++ ){
         if( i < BIGDIM || 
             i % BIGDIM == 0 || 
@@ -37,6 +47,24 @@ void GoStateStruct::ctor(ZobristHash* zh){
 
 }
 
+//GoStateStruct::~GoStateStruct(){
+//cout << "called from where?" << endl;
+    //don't delete zhasher, it is shared by everyone
+
+    //setBoard(11,'w');
+    //delete[] frozen_board;
+    //delete[] past_zhashes;
+    //delete[] neighbor_array;
+    //delete[] internal_neighbor_array;
+    //delete[] filtered_array; 
+    //delete[] internal_filtered_array;
+    //delete[] color_array;
+    //delete[] empty_intersections;
+    //delete[] frozen_empty_intersections;
+    //delete marked;
+    //delete    
+    //}
+
 void GoStateStruct::freezeBoard(){
     memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
     memcpy( frozen_empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
@@ -55,23 +83,23 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     target->zhash = zhash;
     target->player = player;
     target->action = action;
+    target->past_action = past_action;
     target->num_open = num_open;
     target->frozen_num_open = frozen_num_open;
     target->zhasher = zhasher;
+
     memcpy( target->board, board, BOARDSIZE*sizeof(char) );
     memcpy( target->frozen_board, frozen_board, BOARDSIZE*sizeof(char) );
     memcpy( target->empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
     memcpy( target->frozen_empty_intersections, frozen_empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
 
-    target->past_action = past_action;
     memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
-
 }
 
-void* GoStateStruct::copy(){
+GoStateStruct* GoStateStruct::copy(){
     GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
     this->copyInto(s);
-    return (void*) s;
+    return s;
 };
 
 char GoStateStruct::flipColor( char c ){
@@ -98,6 +126,7 @@ string GoStateStruct::boardToString( char* board ){
     out << "\n 0 ";
     //out += ss.str();
     for( int i=0; i<BOARDSIZE; i++ ){
+        //cout << "i: " << i << endl;
         if(      board[i] == BLACK    ){ out << "x"; }
         else if( board[i] == WHITE    ){ out << "o"; }
         else if( board[i] == OFFBOARD ){ out << "_"; }
@@ -211,6 +240,8 @@ void GoStateStruct::setBoard( int* ixs, int len, char color ){
     }
 }    
 
+//if space is no object, why not just have an array with marked values
+//this way don't need to iterate all the way though the 0's
 void GoStateStruct::capture( BitMask* bm ){
     int nSet = 0;
     int ix = 0;
@@ -359,33 +390,49 @@ bool GoStateStruct::floodFill(
     while( !queue.isEmpty() ){
         int ix = queue.pop();
  
-        //find if there are neighbors that cause flood fill to stop
-        int filtered_len = 0;
-        neighborsOf2( internal_filtered_array,
-                      &filtered_len,
-                      ix, adjacency, stop_color );
-
-        bool stop_color_is_in_neighbs = filtered_len > 0;
-        if( stop_color_is_in_neighbs ){
-            stop_color_not_encountered = false;
-            break;
-        }
-        /*
-        else if( connected_to_lib.get(ix) ){
+        if( false ){ //connected_to_lib.get(ix) ){
             //cout << "ix: " << ix << " connected to lib" << endl;
             stop_color_not_encountered = false;
             continue;
-        }*/
+        }
         else {
-            neighborsOf2( internal_filtered_array,
-                          &filtered_len,
-                          ix, adjacency, flood_color );
-            
-            for( int faix=0; faix < filtered_len; faix++ ){
-                int nix = internal_filtered_array[faix];
-                //cout << "same color neighb of: " << ix << " : " << nix << endl;
+            //N
+            int nix;
+            if( board[ix-BIGDIM] == stop_color ||
+                board[ix+BIGDIM] == stop_color || 
+                board[ix+1] == stop_color ||
+                board[ix-1] == stop_color ){ 
+                stop_color_not_encountered = false;
+                break;
+            }
+
+            nix = ix-BIGDIM;
+            if( board[nix] == flood_color  ){ 
                 if( !marked.get( nix) ){
-                    //cout << "pushing: " << nix << " on queue" << endl;
+                    queue.push(nix);
+                    marked.set( nix,true);
+                }
+            }
+            //S
+            nix = ix+BIGDIM;
+            if( board[nix] == flood_color ){
+                if( !marked.get( nix) ){
+                    queue.push(nix);
+                    marked.set( nix,true);
+                }
+            }
+            //E
+            nix = ix+1;
+            if( board[nix] == flood_color ){
+                if( !marked.get( nix) ){
+                    queue.push(nix);
+                    marked.set( nix,true);
+                }
+            }
+            //W
+            nix = ix-1;
+            if( board[nix] == flood_color ){  //W
+                if( !marked.get( nix) ){
                     queue.push(nix);
                     marked.set( nix,true);
                 }
@@ -396,9 +443,10 @@ bool GoStateStruct::floodFill(
     return stop_color_not_encountered;
 }
 
+//TODO much faster if we have access to a hash_map O(n) -> O(1)
 bool GoStateStruct::isDuplicatedByPastState(){
     for( int i=NUM_PAST_STATES-1; i>=0; i-- ){
-        if( zhash == past_zhashes[i] ){ return true; }
+        if( zhash == past_zhashes[i] ){ return true; break; }
     }
     return false;
 }
@@ -441,6 +489,7 @@ bool GoStateStruct::applyAction( int action,
         bool has_lib = false;
 
         int ncolor;
+        //TODO unroll these loops
         //NSEW (orthog) neighbs
         for( int i=0; i<4; i++ ){
             ncolor = ix2color( neighbor_array[i] );
@@ -516,6 +565,7 @@ bool GoStateStruct::applyAction( int action,
                 }
                 else {
                     //add the marked stones into the ones with liberties
+                    //marked.copyInto( &connected_to_lib );
                     //connected_to_lib.Or( marked );
                 }
             }
@@ -594,17 +644,16 @@ bool GoStateStruct::applyAction( int action,
 
 int GoStateStruct::randomAction( BitMask* to_exclude,
                                  bool side_effects ){
-    //for( int i=0; i<num_open; i++ ){
-    //cout << empty_intersections[i] << ", ";
-    //}
-    //cout << endl;
     int end = num_open-1;
-    //cout << "num_open: " << num_open << endl;
-    int r;
+    uint32_t r;
+
     bool legal_but_excluded_move_available = false;
     while( end >= 0 ){
         //TODO: rand can generate a 0 move here, PASS when we don't want it
-        r = rand() % (end+1);
+        //NOTE: can't use rand() because it causes kernel blocking
+        //      not good when trying to parallelize
+        //r = rand() % (end+1);
+        r = getRandom(&m_z,&m_w) % (end+1);
         
         //swap empty[end] and empty[r]
         int temp = empty_intersections[end];
@@ -619,13 +668,11 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
         //test whether the move legal and not excluded
         //return intersection if so
         int candidate = empty_intersections[num_open-1];
-        //cout << "candidate: " << candidate << endl;
         bool ix_is_excluded = to_exclude->get(candidate);
         if( legal_but_excluded_move_available ){
             if( ! ix_is_excluded ){
                 bool is_legal = applyAction( candidate, side_effects );
                 if( is_legal ){
-                    //cout << "num tried until legal1: " << j << endl;
                     return candidate;
                 }
             }
@@ -638,7 +685,6 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
                     legal_but_excluded_move_available = true;
                 }
                 else{
-                    //cout << "num tried until legal: " << j << endl;
                     return candidate;
                 }
             }
@@ -655,90 +701,6 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     }
 }
 
-//DEPRECATED
-//pre the empty_intersection days
-//a nice lazy approach to Fischer-Yates shuffle and empty ix iteration
-//keeping because conceived and implement so cleanly
-//will delete eventually
-/*
-__host__
-int GoStateStruct::randomAction2( BitMask* to_exclude, 
-                                 bool side_effects ){
-    //stores the empty positions we come across in board
-    //filled from right to left
-    //int empty_intersections[num_open];
-    int end = num_open-1;
-    int begin = num_open;
-    int r;
-
-    bool legal_but_excluded_move_available = false;
-
-    //board_ix tracks our progress through board looking for empty intersections
-    int board_ix, num_needed, num_found;
-    board_ix = 0;
-    while( end >= 0 ){
-        r = rand() % (end+1);
-        //we want to swap the rth and end_th empty intersections.
-        //but we are lazy, so don't the rth position might not be filled yet
-        //if not, keep searching through board until more are found
-        if( r < begin ){
-            num_needed = begin-r;
-            num_found = 0;
-            while( num_found < num_needed ){
-                if( board[board_ix] == EMPTY ){
-                    begin--;
-                    empty_intersections[begin] = board_ix;
-                    num_found++;
-                }
-                board_ix++;
-                assert( board_ix <= BOARDSIZE );
-            }
-        }
-
-        //swap empty[end] and empty[r]
-        int temp = empty_intersections[end];
-        empty_intersections[end] = empty_intersections[r];
-        empty_intersections[r] = temp;
-
-        //test whether the move legal and not excluded
-        //return intersection if so
-        int candidate = empty_intersections[end];
-        //cout << "candidate: " << candidate << endl;
-        bool ix_is_excluded = to_exclude->get(candidate);
-        if( legal_but_excluded_move_available ){
-            if( ! ix_is_excluded ){
-                bool is_legal = applyAction( candidate, side_effects );
-                if( is_legal ){
-                    //cout << "num tried until legal1: " << j << endl;
-                    return candidate;
-                }
-            }
-        }
-        else{
-            bool is_legal = applyAction( candidate, 
-                                         side_effects && !ix_is_excluded);
-            if( is_legal ){
-                if( ix_is_excluded ){
-                    legal_but_excluded_move_available = true;
-                }
-                else{
-                    //cout << "num tried until legal: " << j << endl;
-                    return candidate;
-                }
-            }
-        }
-
-        //if did not return a legal move, keep going
-        end--;
-    }
-
-    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
-    else { 
-        applyAction( PASS, side_effects );
-        return PASS;
-    }
-}
-*/
 
 bool GoStateStruct::isTerminal(){
     bool r = action == PASS && past_action == PASS;
@@ -997,6 +959,14 @@ bool BitMask::get( int bit ){
     return mask[bit];
 }
 
+
+//void BitMask::Or( BitMask bm ){
+//for( int i=0; i < BOARDSIZE; i++ ){ 
+//this->mask[i] |= bm.mask[i];
+//}
+//}
+    
+
 /////////////////////////////////////////////////////////////////////////////
 //                     Queue.cu
 /////////////////////////////////////////////////////////////////////////////
@@ -1033,6 +1003,7 @@ int Queue::pop(){
 bool Queue::isEmpty(){
     return nElems == 0; 
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 //             Zobrist
@@ -1074,45 +1045,49 @@ int ZobristHash::sizeOf(){ return int_bits; }
 int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     int white_win = 0;
     int black_win = 0;
-    int ta = clock();
-    int t1,t1b, tcopy_avg;
-    int t2,t2b, trand_avg;
-    int t3,t3b, tappl_avg;
-    int trewd_avg;
-    tcopy_avg = 0;
-    trand_avg = 0;
-    tappl_avg = 0;
-    trewd_avg = 0;
+    //int ta = clock();
+    //int t1,t1b, tcopy_avg;
+    //int t2,t2b, trand_avg;
+    //int t3,t3b, tappl_avg;
+    //int trewd_avg;
+    //tcopy_avg = 0;
+    //trand_avg = 0;
+    //tappl_avg = 0;
+    //trewd_avg = 0;
     //int total_move_count = 0;
     for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        t1 = clock();
+        //t1 = clock();
         GoStateStruct* linear = (GoStateStruct*) gss->copy();
-         
-        t1b = clock();
-        tcopy_avg += t1b-t1;
+
+        //NOTE: Turn timing off when OpenMP used, clock() synchronizes
+        //      in the kernel and slows everything down
+        //t1b = clock();
+        //tcopy_avg += t1b-t1;
         BitMask to_exclude;
         int move_count = 0;
         while( move_count < MAX_MOVES && !linear->isTerminal() ){
-            t2 = clock();
+            //t2 = clock();
             int action = linear->randomAction( &to_exclude, true );
 
-            t2b = clock();
-            trand_avg += t2b-t2;
+            //t2b = clock();
+            //trand_avg += t2b-t2;
 
             //printf( "%s\n\n", linear->toString().c_str() );
             //cout << "hit any key..." << endl;
             //cin.ignore();
-            
-            t3b = clock();
-            tappl_avg += t3b-t3;
+
+            //t3b = clock();
+            //tappl_avg += t3b-t3;
+            move_count++;
         }
         //cout << "after sim: " << linear->toString() << endl;
 
         int rewards[2];
-        int t4 = clock();
+        //int t4 = clock();
         linear->getRewards( rewards );
-        int t4b = clock();
-        trewd_avg += t4b - t4;
+        delete linear;
+        //int t4b = clock();
+        //trewd_avg += t4b - t4;
         if( rewards[0] == 1 ){
             white_win++;
         }
@@ -1121,20 +1096,103 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         }
         //printf("rewards[0]: %d, rewards[1]: %d\n", rewards[0], rewards[1] );
     }
-    int tb = clock();
-    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-    printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
-    printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
-    //printf("avg appl time: %f\n", ((float) tappl_avg)/CLOCKS_PER_SEC);  // /div by total_move_count to get avg
-    printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
+    //int tb = clock();
+    //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+    //printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
+    //printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
+    //printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
 
     //printf( "dev white win count: %d\n", white_win_dev );
     //printf( "host white win count: %d\n", white_win_host );
-    
+
     //assert( white_win+black_win == NUM_SIMULATIONS );
     rewards[0] = white_win;
     rewards[1] = black_win;
-    
+
     return 0;
 }
+
+//DEPRECATED
+//pre the empty_intersection days
+//a nice lazy approach to Fischer-Yates shuffle and empty ix iteration
+//could be useful if we go back to using GPU
+/*
+__host__
+int GoStateStruct::randomAction2( BitMask* to_exclude, 
+                                 bool side_effects ){
+    //stores the empty positions we come across in board
+    //filled from right to left
+    //int empty_intersections[num_open];
+    int end = num_open-1;
+    int begin = num_open;
+    int r;
+
+    bool legal_but_excluded_move_available = false;
+
+    //board_ix tracks our progress through board looking for empty intersections
+    int board_ix, num_needed, num_found;
+    board_ix = 0;
+    while( end >= 0 ){
+        r = rand() % (end+1);
+        //we want to swap the rth and end_th empty intersections.
+        //but we are lazy, so don't the rth position might not be filled yet
+        //if not, keep searching through board until more are found
+        if( r < begin ){
+            num_needed = begin-r;
+            num_found = 0;
+            while( num_found < num_needed ){
+                if( board[board_ix] == EMPTY ){
+                    begin--;
+                    empty_intersections[begin] = board_ix;
+                    num_found++;
+                }
+                board_ix++;
+                assert( board_ix <= BOARDSIZE );
+            }
+        }
+
+        //swap empty[end] and empty[r]
+        int temp = empty_intersections[end];
+        empty_intersections[end] = empty_intersections[r];
+        empty_intersections[r] = temp;
+
+        //test whether the move legal and not excluded
+        //return intersection if so
+        int candidate = empty_intersections[end];
+        //cout << "candidate: " << candidate << endl;
+        bool ix_is_excluded = to_exclude->get(candidate);
+        if( legal_but_excluded_move_available ){
+            if( ! ix_is_excluded ){
+                bool is_legal = applyAction( candidate, side_effects );
+                if( is_legal ){
+                    //cout << "num tried until legal1: " << j << endl;
+                    return candidate;
+                }
+            }
+        }
+        else{
+            bool is_legal = applyAction( candidate, 
+                                         side_effects && !ix_is_excluded);
+            if( is_legal ){
+                if( ix_is_excluded ){
+                    legal_but_excluded_move_available = true;
+                }
+                else{
+                    //cout << "num tried until legal: " << j << endl;
+                    return candidate;
+                }
+            }
+        }
+
+        //if did not return a legal move, keep going
+        end--;
+    }
+
+    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
+    else { 
+        applyAction( PASS, side_effects );
+        return PASS;
+    }
+}
+*/
 

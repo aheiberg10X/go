@@ -11,13 +11,13 @@
 #define NUM_THREADS 4 
 
 //How many itertions of MCTS before best move selected?
-#define NUM_ITERATIONS 100
+#define NUM_ITERATIONS 10000
 
 #define BALANCING_CONSTANT (1/sqrt(2))
 
 //GoStateStruct Constants
 //set these
-#define DIMENSION 19 
+#define DIMENSION 19
 
 //Leave these alone
 #define MAX_EMPTY (DIMENSION*DIMENSION)
