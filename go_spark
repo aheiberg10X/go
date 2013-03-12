@@ -1,3 +1,141 @@
+3/12/13
+
+Something curious.  When I broke up kernel.cpp into multiple files for github prettiness, went from 1.93s -> 3.49s for 10k playouts.
+
+I don't believe I changed anything other than this.  I did complilation in one big statement, but that should not matter.  Does breaking up the code really have that big of an effect?
+
+=================================================================
+
+3/7/13
+
+Booyah.  Fixed up all mem leaks (launchSimKernel not freeing the state copy).  Now runs fast in constant mem
+
+Also, realized all the clock I had to remove for OpenMP would have also caused the playout/sec timing to appear slow.  Removed them, now >5000k playouts per second. BOOSH
+
+Need to get 64 bit primes working now, also check that they are actually detecting ko's occasionally.
+
+http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt64.html
+
+--------
+
+More importantly, asked Fred to give me interface to his .so compilation, couldn't diving signature from kooky .h file.  Also asked him for avg.so, just so I have something easy to deal with.  Acutally asked on the 4/5
+
+
+=========================================================================
+
+3/6/13
+
+The reason OpemMP was so slow was the system calls for rand() AND clock() are blocking.  Commenting them out relieved the burden.
+
+Very visible in htop.  Before, processes were spending all their time in the kernel (red), now they are basically all green
+
+weeeeeeeeeeeeeeeee
+
+-------
+
+Erg there is a memory leak.  I think it is the GoStateStruct, the MCTS_Nodes seem solid
+
+working on writing explicit constructor but it is making things crash horribly...???
+
+======================================================================
+
+3/4/13
+
+Got root parallelization almost working, architecture seems good, ran into some bugs:
+
+Problem with doing MCTS search.  If we give it a 100 iterations, it seems to pick positions very close to the upper edge over and over again, even on an otherwise empty board.  100->1000 accentuates this problem.
+Hypothesis is that it is something to do with domain->randomAction auto applying when we don't want it to???
+
+NO!  For some reason, the scoreNode is assigning each node a 1 or 0 (this seems wrong, need to check).  Right now selecting the lower ix child with the max score, need to randomly select among the max.
+
+Why were we smashing score into and int, wtf...
+
+----------
+NEW PROBLEM: using 4 threads takes 4 times as long as 1 thread.  This is useless.  With 'time ./kernel' there is a big system time component, suggesting there is some kind of locking going on
+
+Some good links for this topic in the goby browser folder.  Have ruled out (I think):
+	1 rand issue, implemented getRandom from post, nonblocking
+        2 false sharing issue, increase size of MCTS_Node
+          (not sure if doing what I think, mem usage very similar despite 		  100 fold size increase
+        3 Tried locking each thread to a processor.  
+
+No improvement.  
+Not using and std data structures like the one post, really puzzled as to why there is such a slowdown.  Am I calling OMP right? 
+
+----------------
+Also, need to write method to merge the trees, then decide.
+
+---------------------------------------------------------------------
+
+Right, some performance opts.  Basically inlined the two calls to neighborsOf2() floodFill.  Gave decent improvement
+
+Re-instituted the MAX_MOVE limit count.  This helped to, now up to about 4,000/sec
+
+======================================================================
+
+2/27/13
+
+Constructing test examples for OpenMP (omp.cpp)
+
+Invesitgating dynamic memory allocation for building separate trees
+Should be no probl
+
+Working on do the parallel impl, all of a sudden launchSimKernel on 19x19
+is twice as slow as before.  Cannot figure out where the difference came from
+
+not g++ vs nvcc
+not fix in setBoard concerning empty_intersections...
+
+WHAHAHAHTTTTTT?
+
+---fuck.  it was because of the error in the new bitmask.  Since it wasn't updating the size, and capture() depended on it, no caputures were happing and the game was super short, that's why it was so fast
+
+also, why is applyAction taking so long outside of floodFill?
+
+oh well, keep moving on parallel
+try to integrate fred's compiled stuff
+
+=====================================================================
+
+2/26/13
+
+Talked with Fred.  Gameplan
+
+1) Integrate Value function with MCTS.  Can do by either MATLAB->exe compiliing and then linking, or re-write MATLAB code in C and use directly.
+Try option 1 (wait until built on Linux machine, not Mac).  Also get CPU root parallelization working.  Evaluate whether this is better than random and UCT.  His code is 19x19 only
+
+2) Value iteration comes second.  GPU might lend itself nicely here, would force the rewrite.
+
+---------------------------------------------------------
+State of the Code
+
+-randomAction is both out of whack between __device__ and __host__
+-still need 64 bit Zobrist hashing, mersenneTwister to generate Rands
+-smaller board rep nice, but necessary? (yes if going to get to value iteration)
+-simplifiy 1 and 2 versions of function to just the best one
+
+did some cleanup and commenting
+
+
+=====================================================================
+
+2/20/13
+
+More performance.  Implemented the smarter randomAction scheme, got a huge payoff at memory cost.  Maintaining the empty_intersections is mem expensive, and adds over head to freeze,thaw, setBoard but really streamlines finding a random move.
+
+Somehow applyAction (not its children???? wtf) is taking up the time right now.  not sure if interpreting gprof correctly.  BitMask::set is not far behind, owing to all the division and moding at each step.  
+
+Taking out the connected_to_lib logic actually gave a slight speedup , turns out overhead not worth it
+
+Inlined isSuicide into applyAction, gave some opportunities to avoid redundant work, and some short circuiting
+
+Changed bitmask implementation to bool[].  50% faster, as don't need to do so many divides and mods.  Again paying a big space tradeoff
+
+Right now 19x19 sits at just under 5KB.  Can sim 10000 boards in 2-3 secs, depending on how you count. 3.5 - 5k boards a second
+
+
+=========================================================
+
 2/19/13
 
 To generate 64 bit randoms for Zobrist hashing:  
