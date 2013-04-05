@@ -76,6 +76,8 @@ struct GoStateStruct{
 
     string boardToString( char* board );
 
+    int bufferix2nobufferix( int ix );
+
     int neighbor( int ix, DIRECTION dir);
 
     int ix2action( int ix, char player );

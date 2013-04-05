@@ -22,7 +22,7 @@ public :
     MCTS_Node* randomPolicy( MCTS_Node* node, 
                              void*      state );
 
-    MCTS_Node* valueFunction( MCTS_Node* node,
+    MCTS_Node* valuePolicy( MCTS_Node* node,
                               void*      state );
 
     MCTS_Node* uctPolicy( MCTS_Node* node, 

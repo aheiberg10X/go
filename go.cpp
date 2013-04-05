@@ -16,6 +16,9 @@
 #include <time.h>
 #include <stdint.h>
 
+//value function
+#include "value_functions/value2.h"
+
 using namespace std;
 
 int main(){
@@ -34,8 +37,26 @@ int main(){
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
 
-    //playout simulation performance timing
+    //testing the linking of MATLAB compiled code to do value computation
     if( true ){
+        mclInitializeApplication(NULL,0);
+        value2Initialize();
+        Domain* domain = (Domain*) new GoDomain();
+        MCTS mcts(domain);
+        MCTS_Node* dummy_node = new MCTS_Node( 2, 42 );
+        GoStateStruct* gss = new GoStateStruct;
+        gss->ctor(zh);
+        //set board to example?
+        cout << "here" << endl;
+        mcts.valuePolicy( dummy_node, gss );
+        cout << "here2" << endl;
+        value2Terminate();
+        mclTerminateApplication();
+    }
+
+
+    //playout simulation performance timing
+    if( false ){
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
 
@@ -117,6 +138,7 @@ int main(){
         }
     }
     
+    //test basic random and apply functionality on pre-configured boards
     if( false ){
         
         GoStateStruct* gss = new GoStateStruct;
@@ -126,15 +148,12 @@ int main(){
         for( int i=0; i<3; i++ ){
             gss->setBoard( gss->coord2ix( wi[i], wj[i] ), WHITE );
         }
-
         cout << gss->toString() << endl;
         BitMask empty;
         int action = gss->randomAction( &empty, true );
         cout << gss->toString() << endl;
     }
 
-   
-    
     //domain testing
     //randomAction and applyAction, the crucial parts of the simulation kernel,
     //work in fixed memory

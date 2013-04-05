@@ -7,6 +7,11 @@
 #include "gostate_struct.h"
 #include "kernel.h"
 
+//value function
+#include "value_functions/value2.h"
+#include "matrix.h"
+#include "weights.h"
+
 using namespace std;
 
 MCTS::MCTS( Domain* d ){
@@ -91,9 +96,76 @@ MCTS_Node* MCTS::treePolicy( MCTS_Node* node,
     return randomPolicy( node, state );
 }
 
-MCTS_Node* MCTS::valueFunction( MCTS_Node* node, 
-                                void* state ){
-    //TODO
+//this go specific from the beginning, so won't mind breaking abstraction
+MCTS_Node* MCTS::valuePolicy( MCTS_Node* node, 
+                              void* uncast_state ){
+
+    //input
+    mxArray *w = mxCreateNumericMatrix(WEIGHTS_SIZE, 1, mxDOUBLE_CLASS, mxREAL);
+    memcpy( (double*) mxGetPr(w), WEIGHTS, WEIGHTS_SIZE*sizeof(double) );
+
+    mxArray *x = mxCreateNumericMatrix(MAX_EMPTY, 1, mxDOUBLE_CLASS, mxREAL);
+
+    //output
+    mxArray* V = mxCreateDoubleScalar(0); 
+
+    //Build an un-border-buffered version of gss->board
+    //use doubles instead of chars
+    //this overhead is very small compared to the time spent in mlfValue
+    double double_board[MAX_EMPTY];
+
+    GoStateStruct* gss = (GoStateStruct *) uncast_state;
+
+    while( node->marked && !domain->isTerminal( uncast_state ) ){
+        //TODO, what is min valueFunction will take?
+        double max_value = -999999;
+        int max_actions[BOARDSIZE];
+        int max_actions_end = 0;
+        for( int action=0; action<BOARDSIZE; action++ ){
+            if( gss->board[action] == OFFBOARD ){ continue; }
+            double value;
+            //if have a value already
+            if( node->tried_actions->get(action) ){
+                value = node->value;
+            }
+            //else no value/node yet
+            else{
+                cout << "don't have value for action: " << action << endl;
+                //create a node
+                MCTS_Node* child_node = new MCTS_Node( node, action );
+                //build new double board to feed to MATLAB value func
+                for( int i=0; i<BOARDSIZE; i++ ){
+                    int nobufferix = gss->bufferix2nobufferix( i );
+                    if( gss->board[i] == 'o' ){
+                        assert( nobufferix == -1 );
+                    }
+                    else if( gss->board[i] == 'w' ){
+                        double_board[nobufferix] = -1;
+                    }
+                    else if( gss->board[i] == 'e' ){
+                        double_board[nobufferix] = 0;
+                    }
+                    else if( gss->board[i] == 'b' ){
+                        double_board[nobufferix] = 1;
+                    }
+                }
+                memcpy( (double*) mxGetPr(x), double_board, MAX_EMPTY*sizeof(double) );
+                bool success = mlfValue2(1, &V, x, w);
+                double* r = mxGetPr(V);
+                value = r[0];
+            }
+            if( value == max_value ){
+                max_actions[max_actions_end++] = action;
+            }
+            else if( value > max_value ){
+                max_value = value;
+                max_actions[0] = action;
+                max_actions_end = 1;
+            }
+
+        }
+        break;
+    }
     return node;
 }
 

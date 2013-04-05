@@ -17,6 +17,7 @@ public :
     int* total_rewards;
     int num_players;
     int num_actions;
+    double value;
 
     int avoid_false_sharing[128];
 
@@ -37,7 +38,7 @@ public :
     bool marked;
 
     //tentative
-    int value;
+    /*int value;*/
     bool fully_expanded;
 
     MCTS_Node(int anum_players, int anum_actions);

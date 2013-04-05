@@ -1,6 +1,10 @@
 #include "gostate_struct.h"
 #include "kernel.h"
 
+//turns out rand() does some blocking in the OS kernel.  When using OpenMP
+//to parallelize, all the threads would step on each other's toes.
+//Got this simple pseudo-rand funtion from stackoverflow that doesn't do 
+//this
 uint32_t m_z = rand();
 uint32_t m_w = rand();
 uint32_t nextRandom;
@@ -46,24 +50,6 @@ void GoStateStruct::ctor(ZobristHash* zh){
     }
 
 }
-
-//GoStateStruct::~GoStateStruct(){
-//cout << "called from where?" << endl;
-    //don't delete zhasher, it is shared by everyone
-
-    //setBoard(11,'w');
-    //delete[] frozen_board;
-    //delete[] past_zhashes;
-    //delete[] neighbor_array;
-    //delete[] internal_neighbor_array;
-    //delete[] filtered_array; 
-    //delete[] internal_filtered_array;
-    //delete[] color_array;
-    //delete[] empty_intersections;
-    //delete[] frozen_empty_intersections;
-    //delete marked;
-    //delete    
-    //}
 
 void GoStateStruct::freezeBoard(){
     memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
@@ -161,6 +147,18 @@ string GoStateStruct::toString(){
     ss << "Num open: " << num_open << endl;
     out += ss.str();
     return out;
+}
+
+//TODO this is static, make it so
+int GoStateStruct::bufferix2nobufferix( int ix ){
+    int row = ix / BIGDIM;
+    int col = ix % BIGDIM;
+    if( row == 0 || row == BIGDIM-1 || col == 0 || col == BIGDIM-1 ){ 
+        return -1;
+    }
+    else{
+        return ix - BIGDIM - 1 - (row-1) * 2;
+    }
 }
 
 int GoStateStruct::ix2action( int ix, char player ){
@@ -960,13 +958,6 @@ bool BitMask::get( int bit ){
 }
 
 
-//void BitMask::Or( BitMask bm ){
-//for( int i=0; i < BOARDSIZE; i++ ){ 
-//this->mask[i] |= bm.mask[i];
-//}
-//}
-    
-
 /////////////////////////////////////////////////////////////////////////////
 //                     Queue.cu
 /////////////////////////////////////////////////////////////////////////////
@@ -1045,7 +1036,7 @@ int ZobristHash::sizeOf(){ return int_bits; }
 int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     int white_win = 0;
     int black_win = 0;
-    //int ta = clock();
+    int ta = clock();
     //int t1,t1b, tcopy_avg;
     //int t2,t2b, trand_avg;
     //int t3,t3b, tappl_avg;
@@ -1096,8 +1087,8 @@ int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
         }
         //printf("rewards[0]: %d, rewards[1]: %d\n", rewards[0], rewards[1] );
     }
-    //int tb = clock();
-    //printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
+    int tb = clock();
+    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
     //printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
     //printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
     //printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
