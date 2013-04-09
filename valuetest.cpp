@@ -23,7 +23,7 @@ int main(){
     mxArray *x = mxCreateNumericMatrix(size, 1, mxDOUBLE_CLASS, mxREAL);
     memcpy( (double*) mxGetPr(x), board, size*sizeof(double) );
 
-    cout << weights[0] << endl;
+    cout << WEIGHTS[0] << endl;
     
     mxArray *w = mxCreateNumericMatrix(WEIGHTS_SIZE, 1, mxDOUBLE_CLASS, mxREAL);
     memcpy( (double*) mxGetPr(w), WEIGHTS, WEIGHTS_SIZE*sizeof(double) );

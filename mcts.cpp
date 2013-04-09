@@ -99,8 +99,6 @@ MCTS_Node* MCTS::treePolicy( MCTS_Node* node,
 //this go specific from the beginning, so won't mind breaking abstraction
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node, 
                               void* uncast_state ){
-
-    //input
     mxArray *w = mxCreateNumericMatrix(WEIGHTS_SIZE, 1, mxDOUBLE_CLASS, mxREAL);
     memcpy( (double*) mxGetPr(w), WEIGHTS, WEIGHTS_SIZE*sizeof(double) );
 
@@ -109,6 +107,7 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
     //output
     mxArray* V = mxCreateDoubleScalar(0); 
 
+    
     //Build an un-border-buffered version of gss->board
     //use doubles instead of chars
     //this overhead is very small compared to the time spent in mlfValue
@@ -126,14 +125,22 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
             double value;
             //if have a value already
             if( node->tried_actions->get(action) ){
-                value = node->value;
+                cout << "have action" << endl;
+                value = node->children[action]->value;
             }
             //else no value/node yet
+            //TODO
+            //need to test legality here
+            //right now we are just copying the EXISTING board to the -1,0,1
+            //format and evaling.  This was just to test
+            //Need to see if action is a legal one, if it is, create a new
+            //-1.0.1 board to evaluate with the move played and evaluate
             else{
                 cout << "don't have value for action: " << action << endl;
                 //create a node
                 MCTS_Node* child_node = new MCTS_Node( node, action );
                 //build new double board to feed to MATLAB value func
+                //cout << "new node created" << endl;
                 for( int i=0; i<BOARDSIZE; i++ ){
                     int nobufferix = gss->bufferix2nobufferix( i );
                     if( gss->board[i] == 'o' ){
@@ -151,9 +158,14 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                 }
                 memcpy( (double*) mxGetPr(x), double_board, MAX_EMPTY*sizeof(double) );
                 bool success = mlfValue2(1, &V, x, w);
+                //cout << "success: " << success << endl;
                 double* r = mxGetPr(V);
+                //double r[1] = {42};
                 value = r[0];
+                child_node->value = value;
+                
             }
+            cout << "value is: " << value << "\n" << endl;
             if( value == max_value ){
                 max_actions[max_actions_end++] = action;
             }
@@ -163,9 +175,33 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                 max_actions_end = 1;
             }
 
-        }
-        break;
-    }
+            //the action we choose to take
+            int action;
+            cout << max_actions_end << " actions with max value" << endl;
+            double r = (double) rand() / RAND_MAX;
+            cout << "random: " << r << endl;
+            if( r < EGREEDY ){
+                //choose randomly amongst the best valued actions
+                int rix = rand() % max_actions_end;
+                cout << "going greedy, using action: " << max_actions[rix] << " (rix =" << rix << ")" << endl;
+                action = max_actions[rix];
+            }
+            else{
+                cout << "going random" << endl;
+                action = rand() % BOARD
+            }
+
+            node = node->children[action];
+
+        }// for action
+    }//while not terminal
+
+    mxDestroyArray(V);
+    cout << "hello" << endl;
+    mxDestroyArray(x);
+    cout << "there" << endl;
+    mxDestroyArray(w);
+    cout << "returning node" << endl;
     return node;
 }
 

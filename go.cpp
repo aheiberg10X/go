@@ -15,6 +15,7 @@
 #include <iostream>
 #include <time.h>
 #include <stdint.h>
+#include "weights.h"
 
 //value function
 #include "value_functions/value2.h"
@@ -39,33 +40,40 @@ int main(){
 
     //testing the linking of MATLAB compiled code to do value computation
     if( true ){
+        //input
+        //TODO, do this once somewhere, weights.h?
+        //Wasteful right now, but not the bottleneck
+        //
         mclInitializeApplication(NULL,0);
+                //
         value2Initialize();
+        //
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
-        MCTS_Node* dummy_node = new MCTS_Node( 2, 42 );
+        MCTS_Node* dummy_node = new MCTS_Node( 2, BOARDSIZE );
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
-        //set board to example?
+        ///set board to example?
         cout << "here" << endl;
-        mcts.valuePolicy( dummy_node, gss );
-        cout << "here2" << endl;
+        MCTS_Node* return_node1 = mcts.valuePolicy( dummy_node, gss );
+
+        ////Causing double free errors...???
         value2Terminate();
         mclTerminateApplication();
     }
-
-
-    //playout simulation performance timing
-    if( false ){
-        GoStateStruct* gss = new GoStateStruct;
-        gss->ctor(zh);
-
-        //BitMask* to_exclude = new BitMask;
-        //int action = gss->randomAction( to_exclude, false );
-        int rewards[2];
-        launchSimulationKernel( gss, rewards );
-    }
-
+        //
+        //
+    ////playout simulation performance timing
+    //if( false ){
+    //GoStateStruct* gss = new GoStateStruct;
+    //gss->ctor(zh);
+    //
+    ////BitMask* to_exclude = new BitMask;
+    ////int action = gss->randomAction( to_exclude, false );
+    //int rewards[2];
+    //launchSimulationKernel( gss, rewards );
+    //}
+    
     //play a full MCTS game
     if( false ){
         Domain* domain = (Domain*) new GoDomain();
@@ -153,46 +161,6 @@ int main(){
         int action = gss->randomAction( &empty, true );
         cout << gss->toString() << endl;
     }
-
-    //domain testing
-    //randomAction and applyAction, the crucial parts of the simulation kernel,
-    //work in fixed memory
-    /*
-    if( false ){
-
-        //string name = "original";
-        //GoState* state = new GoState( false );
-        GoStateStruct* state = new GoStateStruct();
-
-        const int l = 6;
-        int is[l] = {2,2,3,3,4,4};
-        int js[l] = {1,3,2,3,1,2};
-        for( int i=0; i<l; i++ ){
-            state->setBoard( state->coord2ix( is[i], js[i] ), WHITE );
-        }
-        cout << state->toString() << endl;
-        
-        GoStateStruct* state2 = new GoStateStruct();
-        //state->initGSS( );
-
-        const int ll = 6;
-        int is2[ll] = {2,2,3,3,4,4};
-        int js2[ll] = {1,3,2,3,1,2};
-        for( int i=0; i<ll; i++ ){
-            state2->setBoard( state2->coord2ix( is2[i], js2[i] ), BLACK );
-        }
-
-        //cout << state->boardToString( state2->board ) << endl;
-        state->advancePastStates( state2->board,
-                                  state2->player,
-                                  state2->action );
-
-        //cout << state->boardToString( &(state->past_boards[PAST_STATE_SIZE-BOARDSIZE]) ) << endl;
-
-        cout << "duplicated: " << state->isDuplicatedByPastState() << endl;
-          
-    }
-    */
 
 
     return 0;

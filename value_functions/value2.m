@@ -262,7 +262,9 @@ HigherOrderFeatures_xy(1,:)=[HigherOrderFeatures(1,[1:10:9601 4:10:9604 7:10:960
 
 %size(HigherOrderFeatures_xy)
 %size(Weights)
+b = 42
 V = HigherOrderFeatures_xy*Weights; 
+c = 43
 
 % scoreVal=zeros(size(Games{g,3},1),2); % V, score estimation
 % 

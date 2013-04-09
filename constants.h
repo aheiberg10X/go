@@ -13,6 +13,10 @@
 //How many itertions of MCTS before best move selected?
 #define NUM_ITERATIONS 10000
 
+//when doing valuePolicy, use (one of) the best valued action(s) 
+//EGREEDY % of the time
+#define EGREEDY .95
+
 #define BALANCING_CONSTANT (1/sqrt(2))
 
 //GoStateStruct Constants
