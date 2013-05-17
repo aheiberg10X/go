@@ -11,6 +11,7 @@
 #include "value_functions/value2.h"
 #include "matrix.h"
 #include "weights.h"
+#include <time.h>
 
 using namespace std;
 
@@ -24,7 +25,6 @@ MCTS_Node* MCTS::search( void* root_state ){
     int num_players = domain->getNumPlayers( root_state );
     int num_actions = domain->getNumActions( root_state );
     MCTS_Node* root_node = new MCTS_Node( num_players, num_actions );
-    //cout << root_node << endl;
 
     //create a copy of root_state, this will be our scratch space
 
@@ -32,22 +32,29 @@ MCTS_Node* MCTS::search( void* root_state ){
     int rewards[num_players];
 
     int iterations = 0;
+    float tree_policy_time, simulation_time;
+    clock_t t1,t2;
     while( iterations < NUM_ITERATIONS ){
-        //cout << "iteration: " << iterations << endl;
         void* state = domain->copyState( root_state );
         //cout << "\n\ncopied state: " << ((GoStateStruct*) state)->toString() << endl;
         //start from the beginning...
         //cout << endl << endl << "iteration: " << iterations << endl;
         //cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
 
+        t1 = clock();
         node = treePolicy( root_node, state );
-        //cout << "state after tree policy: " << ((GoStateStruct*) state)->toString() << endl;
+        t2 = clock();
+        tree_policy_time += ((float) t2-t1)/CLOCKS_PER_SEC;
+        //cout << "state after tree policy: " << endl; //((GoStateStruct*) state)->toString() << endl;
 
         //TODO
         //break in domain/state interface
         //mcts should assume nothing about the uncast_state and always
         //go through domain
+        t1 = clock();
         launchSimulationKernel( (GoStateStruct*) state, rewards );
+        t2 = clock();
+        simulation_time += ((float) t2-t1)/CLOCKS_PER_SEC;
         //cout << "rewards w/b: " << rewards[0] << "/" << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
@@ -59,7 +66,8 @@ MCTS_Node* MCTS::search( void* root_state ){
     }
 
     assert( root_node->is_root );
-    
+    cout << "Tree policy time: " << tree_policy_time << endl;
+    cout << "Simulation Simte: "<< simulation_time << endl;
     //print out info on each child for debugging
     /*
     MCTS_Node* child;
@@ -92,77 +100,89 @@ MCTS_Node* MCTS::search( void* root_state ){
 
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
                              void*     state ){
-    //return valueFunction( node, state )
+
     return randomPolicy( node, state );
+
+    int player = domain->getPlayerIx(state);
+    //BLACK uses valueFucntion
+    if( player == 1 ){
+        cout << "using value policy" << endl;
+        return valuePolicy( node, state );
+    }
+    else{
+        return randomPolicy( node, state );
+    }
 }
 
 //this go specific from the beginning, so won't mind breaking abstraction
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node, 
                               void* uncast_state ){
+
+    //make the weights vector, from Fred's Training0202.mat
     mxArray *w = mxCreateNumericMatrix(WEIGHTS_SIZE, 1, mxDOUBLE_CLASS, mxREAL);
     memcpy( (double*) mxGetPr(w), WEIGHTS, WEIGHTS_SIZE*sizeof(double) );
 
+    //will hold the -1,0,1 board representation (no outer buffer)
     mxArray *x = mxCreateNumericMatrix(MAX_EMPTY, 1, mxDOUBLE_CLASS, mxREAL);
 
-    //output
+    //output valueation
     mxArray* V = mxCreateDoubleScalar(0); 
 
-    
-    //Build an un-border-buffered version of gss->board
+    //Will hold the un-border-buffered version of some gostate board
     //use doubles instead of chars
     //this overhead is very small compared to the time spent in mlfValue
-    double double_board[MAX_EMPTY];
+    double matlab_board[MAX_EMPTY];
 
     GoStateStruct* gss = (GoStateStruct *) uncast_state;
+    GoStateStruct* working_gss = new GoStateStruct;
 
     while( node->marked && !domain->isTerminal( uncast_state ) ){
+        cout << "what now?" << endl;
         //TODO, what is min valueFunction will take?
         double max_value = -999999;
         int max_actions[BOARDSIZE];
         int max_actions_end = 0;
+        int legal_actions[BOARDSIZE];
+        int legal_actions_end = 0;
+
+        int ta = clock();
         for( int action=0; action<BOARDSIZE; action++ ){
+            cout << "starting on action: " << action << endl;
+
+            //just applied the previous action, restore state to parent
+            gss->copyInto( working_gss );
+    
             if( gss->board[action] == OFFBOARD ){ continue; }
+
+            //the valuation for this action
             double value;
+
             //if have a value already
             if( node->tried_actions->get(action) ){
                 cout << "have action" << endl;
                 value = node->children[action]->value;
             }
             //else no value/node yet
-            //TODO
-            //need to test legality here
-            //right now we are just copying the EXISTING board to the -1,0,1
-            //format and evaling.  This was just to test
-            //Need to see if action is a legal one, if it is, create a new
-            //-1.0.1 board to evaluate with the move played and evaluate
             else{
                 cout << "don't have value for action: " << action << endl;
-                //create a node
-                MCTS_Node* child_node = new MCTS_Node( node, action );
-                //build new double board to feed to MATLAB value func
-                //cout << "new node created" << endl;
-                for( int i=0; i<BOARDSIZE; i++ ){
-                    int nobufferix = gss->bufferix2nobufferix( i );
-                    if( gss->board[i] == 'o' ){
-                        assert( nobufferix == -1 );
-                    }
-                    else if( gss->board[i] == 'w' ){
-                        double_board[nobufferix] = -1;
-                    }
-                    else if( gss->board[i] == 'e' ){
-                        double_board[nobufferix] = 0;
-                    }
-                    else if( gss->board[i] == 'b' ){
-                        double_board[nobufferix] = 1;
-                    }
+                bool is_legal = working_gss->applyAction( action, true );
+                if( !is_legal ){ 
+                    cout << action << " is illegal, skipping" << endl;
+                    continue; 
                 }
-                memcpy( (double*) mxGetPr(x), double_board, MAX_EMPTY*sizeof(double) );
-                bool success = mlfValue2(1, &V, x, w);
-                //cout << "success: " << success << endl;
-                double* r = mxGetPr(V);
-                //double r[1] = {42};
-                value = r[0];
-                child_node->value = value;
+                else{
+                    legal_actions[legal_actions_end++] = action;
+                    MCTS_Node* child_node = new MCTS_Node( node, action );
+                    working_gss->board2MATLAB(matlab_board);
+                    memcpy( (double*) mxGetPr(x), 
+                            matlab_board, 
+                            MAX_EMPTY * sizeof(double) );
+                    bool success = mlfValue2(1, &V, x, w);
+                    cout << "success: " << success << endl;
+                    double* r = mxGetPr(V);
+                    value = r[0];
+                    child_node->value = value;
+                }
                 
             }
             cout << "value is: " << value << "\n" << endl;
@@ -175,25 +195,33 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                 max_actions_end = 1;
             }
 
-            //the action we choose to take
-            int action;
-            cout << max_actions_end << " actions with max value" << endl;
-            double r = (double) rand() / RAND_MAX;
-            cout << "random: " << r << endl;
-            if( r < EGREEDY ){
-                //choose randomly amongst the best valued actions
-                int rix = rand() % max_actions_end;
-                cout << "going greedy, using action: " << max_actions[rix] << " (rix =" << rix << ")" << endl;
-                action = max_actions[rix];
-            }
-            else{
-                cout << "going random" << endl;
-                action = rand() % BOARD
-            }
-
-            node = node->children[action];
-
         }// for action
+        int tb = clock(); 
+        cout << "evaling: " << legal_actions_end << " legal actions took: " << (float (tb-ta))/CLOCKS_PER_SEC << "s" << endl;
+        break;
+
+        //the action we choose to take
+        int chosen_action;
+        cout << max_actions_end << " actions with max value" << endl;
+        double r = (double) rand() / RAND_MAX;
+        cout << "random: " << r << endl;
+
+
+        int rix;
+        if( r < EGREEDY ){
+            //choose randomly amongst the best valued actions
+            rix = rand() % max_actions_end;
+            cout << "going greedy, using action: " << max_actions[rix] << " (rix =" << rix << ")" << endl;
+        }
+        else{
+            cout << "going random" << endl;
+            rix = rand() % legal_actions_end;
+        }
+        chosen_action = max_actions[rix];
+        cout << "chosen action: " << chosen_action << endl;
+        node = node->children[chosen_action];
+        //cout << "hit any key" << endl;
+        //cin.ignore();
     }//while not terminal
 
     mxDestroyArray(V);
@@ -215,7 +243,6 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
     while( node->marked && !domain->isTerminal( uncast_state ) ){
         action = domain->randomAction( uncast_state, 
                                        &empty_to_exclude );
-        //cout << "randPol random action chosen: " << action << endl;
 
         //cout << "state->action : " << ((GoStateStruct* ) uncast_state)->action << endl;
         //if( abs(action) == abs(((GoStateStruct* ) uncast_state)->action) ){

@@ -3,19 +3,19 @@
 
 #include <math.h>
 
-//Use the GPU?
-#define USE_GPU false
+//Use the GPU? Moved on a l0ong time ago...
+/*#define USE_GPU false*/
+#define NTHREADS 4
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 10000
-#define NUM_THREADS 4 
+#define NUM_SIMULATIONS 1000
 
 //How many itertions of MCTS before best move selected?
-#define NUM_ITERATIONS 10000
+#define NUM_ITERATIONS 1000
 
 //when doing valuePolicy, use (one of) the best valued action(s) 
 //EGREEDY % of the time
-#define EGREEDY .95
+#define EGREEDY .65
 
 #define BALANCING_CONSTANT (1/sqrt(2))
 
@@ -34,7 +34,7 @@
 
 //past board state constants
 #define NUM_ZOBRIST_VALUES (BOARDSIZE*2)
-#define NUM_PAST_STATES 20 
+#define NUM_PAST_STATES 20
 
 //bitmask constants
 #define MOD 32 

@@ -76,7 +76,13 @@ struct GoStateStruct{
 
     string boardToString( char* board );
 
-    int bufferix2nobufferix( int ix );
+    void board2MATLAB( double* matlab_board );
+
+    void MATLAB2board( double* matlab_board );
+
+    static int bufferix2nobufferix( int ix );
+
+    static int nobufferix2bufferix( int ix );
 
     int neighbor( int ix, DIRECTION dir);
 
@@ -136,6 +142,7 @@ struct GoStateStruct{
     bool applyAction( int action, bool side_effects );
 
     int randomAction( BitMask* to_exclude, bool side_effects );
+    int randomAction2( BitMask* to_exclude, bool side_effects, int* tries );
     
     bool isTerminal();
 

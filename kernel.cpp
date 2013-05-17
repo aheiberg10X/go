@@ -84,6 +84,7 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
 
 GoStateStruct* GoStateStruct::copy(){
     GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
+    s->ctor( this->zhasher );
     this->copyInto(s);
     return s;
 };
@@ -95,6 +96,45 @@ char GoStateStruct::flipColor( char c ){
 
 void GoStateStruct::togglePlayer() {
     (player == WHITE) ? player = BLACK : player = WHITE;
+}
+
+void GoStateStruct::board2MATLAB( double* matlab_board ){
+    for( int i=0; i<BOARDSIZE; i++ ){
+        int nobufferix = GoStateStruct::bufferix2nobufferix( i );
+        if( board[i] == OFFBOARD ){
+            assert( nobufferix == -1 );
+        }
+        else if( board[i] == WHITE ){
+            matlab_board[nobufferix] = -1;
+        }
+        else if( board[i] == EMPTY ){
+            matlab_board[nobufferix] = 0;
+        }
+        else if( board[i] == BLACK ){
+            matlab_board[nobufferix] = 1;
+        }
+    }
+}
+
+void GoStateStruct::MATLAB2board( double* matlab_board ){
+    for( int ix=0; ix<MAX_EMPTY; ix++ ){
+        int bufferix = GoStateStruct::nobufferix2bufferix(ix);
+        if( matlab_board[ix] == -1 ){
+            setBoard( bufferix, WHITE );
+            //board[bufferix] = WHITE;
+        }
+        else if( matlab_board[ix] == 0 ){
+            setBoard( bufferix, EMPTY );
+            //board[bufferix] = EMPTY;
+        }
+        else if( matlab_board[ix] == 1 ){
+            setBoard( bufferix, BLACK );
+            //board[bufferix] = BLACK;
+        }
+        else{
+            assert(false);
+        }
+    }
 }
 
 string GoStateStruct::boardToString( char* board ){
@@ -161,6 +201,11 @@ int GoStateStruct::bufferix2nobufferix( int ix ){
     }
 }
 
+int GoStateStruct::nobufferix2bufferix( int ix ){
+    int row = ix / DIMENSION;
+    return ix + BIGDIM + 1 + row*2;
+}
+
 int GoStateStruct::ix2action( int ix, char player ){
     int parity = player == WHITE ? 1 : -1;
     return ix * parity;
@@ -176,7 +221,7 @@ char GoStateStruct::action2color( int action ){
 }
 
 int GoStateStruct::ix2color( int ix ){
-    return (ix == OFFBOARD) ? OFFBOARD : board[ix];
+    return isBorder(ix) ? OFFBOARD : board[ix];
 }
 
 int GoStateStruct::coord2ix( int i, int j ){
@@ -200,12 +245,13 @@ bool GoStateStruct::isPass( int action ){
 
 void GoStateStruct::setBoard( int ix, char color ){ 
     if( ix >= BOARDSIZE || board[ix] == OFFBOARD ){ return; } 
+    //if tyring to set the same color as it is, do nothing
+    if( color == board[ix] ){ return; }
 
     char incumbant_color = board[ix]; 
     if( color == EMPTY ){ 
         zhash = zhasher->updateHash( zhash, ix, incumbant_color );
         empty_intersections[num_open++] = ix;
-            //num_open++; 
     } 
     else{ 
         //assert( board[ix] == EMPTY ); 
@@ -253,10 +299,10 @@ void GoStateStruct::capture( BitMask* bm ){
 }
 
 bool GoStateStruct::isBorder( int ix ){
-    if( BIGDIM < ix && ix < 2*BIGDIM-1 ){ return true; }
-    else if( ix % BIGDIM == 1 ){return true; }
-    else if( ix % BIGDIM == BIGDIM-2 ){ return true; }
-    else if( BIGDIM*(BIGDIM-2) < ix && ix < BIGDIM*(BIGDIM-1)-1 ){return true;}
+    if( ix <= BIGDIM-1 ){ return true; }
+    else if( ix % BIGDIM == 0 ){return true; }
+    else if( ix % BIGDIM == BIGDIM-1 ){ return true; }
+    else if( BIGDIM*(BIGDIM-1) <= ix ){return true;}
     else{ return false; }
 }
 
@@ -465,6 +511,11 @@ void GoStateStruct::advancePastStates( int past_zhash,
 
 bool GoStateStruct::applyAction( int action,
                                  bool side_effects ){
+    if( !isBorder(action) && board[action] != EMPTY ){ 
+        cout << "trying to play: " << action << " but it is not empty, has: " << board[action] << endl;
+        assert(false);
+        return false;
+    }
     bool legal = true;
     bool board_frozen = false;
 
@@ -525,7 +576,9 @@ bool GoStateStruct::applyAction( int action,
                 setBoard( ix, color );
                 //cout << "intermediate zhash: " << zhash << endl;
                 legal = !isDuplicatedByPastState();
-                //cout << "duplicated: " << legal << endl;
+                if( !legal ){
+                    //cout << "duplicated: " << endl;
+                }
                 if( !legal || !side_effects ){
                     setBoard( ix, old_color );
                 }
@@ -604,7 +657,11 @@ bool GoStateStruct::applyAction( int action,
             //after done looking for and applying captures, check superko
             if( legal ){
                 //cout << "cur zhash: " << zhash << endl;
-                legal &= !isDuplicatedByPastState();
+                bool dup = isDuplicatedByPastState();
+                if( dup ){
+                    //cout << "state duplicates past" << endl;
+                }
+                legal &= !dup; 
                 //cout << "dup by past state" << legal << endl;
             }
         }
@@ -613,7 +670,7 @@ bool GoStateStruct::applyAction( int action,
     else{
         //PASS played
     }
-    
+   
     //do we apply, or rollback?
     if( legal ){
         if( side_effects ){
@@ -643,10 +700,21 @@ bool GoStateStruct::applyAction( int action,
 int GoStateStruct::randomAction( BitMask* to_exclude,
                                  bool side_effects ){
     int end = num_open-1;
+    //cout << "num_open: " << num_open << endl;
+    //for( int i=0; i<num_open; i++ ){
+    //cout << "empty[" << i << "]: " << empty_intersections[i] << endl;
+    //}
     uint32_t r;
 
+    //cout << "num open: " << num_open << endl;
+
     bool legal_but_excluded_move_available = false;
+    int tries = 0;
     while( end >= 0 ){
+        tries++;
+        //if( tries > 1 ){
+        //cout << "    tries: " << tries << endl;
+        //} 
         //TODO: rand can generate a 0 move here, PASS when we don't want it
         //NOTE: can't use rand() because it causes kernel blocking
         //      not good when trying to parallelize
@@ -698,6 +766,78 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
         return PASS;
     }
 }
+
+int GoStateStruct::randomAction2( BitMask* to_exclude,
+                                 bool side_effects, int* tries ){
+    int end = num_open-1;
+    //cout << "num_open: " << num_open << endl;
+    //for( int i=0; i<num_open; i++ ){
+    //cout << "empty[" << i << "]: " << empty_intersections[i] << endl;
+    //}
+    uint32_t r;
+
+    //cout << "num open: " << num_open << endl;
+
+    bool legal_but_excluded_move_available = false;
+    while( end >= 0 ){
+        (*tries)++;
+        //if( tries > 1 ){
+        //cout << "    tries: " << tries << endl;
+        //} 
+        //NOTE: can't use rand() because it causes kernel blocking
+        //      not good when trying to parallelize
+        //r = rand() % (end+1);
+        //r = end;
+        r = getRandom(&m_z,&m_w) % (end+1);
+        
+        //swap empty[end] and empty[r]
+        int temp = empty_intersections[end];
+        empty_intersections[end] = empty_intersections[r];
+        empty_intersections[r] = temp;
+
+        //swap empty[end] to empty[num_open-1]
+        //this is for a speedup to setBoard
+        temp = empty_intersections[num_open-1];
+        empty_intersections[num_open-1] = empty_intersections[end];
+        empty_intersections[end] = temp;
+        
+        //test whether the move legal and not excluded
+        //return intersection if so
+        int candidate = empty_intersections[num_open-1];
+        bool ix_is_excluded = to_exclude->get(candidate);
+        if( legal_but_excluded_move_available ){
+            if( ! ix_is_excluded ){
+                bool is_legal = applyAction( candidate, side_effects );
+                if( is_legal ){
+                    return candidate;
+                }
+            }
+        }
+        else{
+            bool is_legal = applyAction( candidate, 
+                                         side_effects && !ix_is_excluded);
+            if( is_legal ){
+                if( ix_is_excluded ){
+                    legal_but_excluded_move_available = true;
+                }
+                else{
+                    return candidate;
+                }
+            }
+        }
+
+        //if did not return a legal move, keep going
+        end--;
+    }
+    
+    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
+    else { 
+        applyAction( PASS, side_effects );
+        return PASS;
+    }
+}
+
+
 
 
 bool GoStateStruct::isTerminal(){
@@ -1033,74 +1173,83 @@ int ZobristHash::updateHash( int hash, int position, char color ){
 
 int ZobristHash::sizeOf(){ return int_bits; }
 
-int launchSimulationKernel( GoStateStruct* gss, int* rewards ){
+void launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     int white_win = 0;
     int black_win = 0;
-    int ta = clock();
-    //int t1,t1b, tcopy_avg;
-    //int t2,t2b, trand_avg;
-    //int t3,t3b, tappl_avg;
-    //int trewd_avg;
-    //tcopy_avg = 0;
-    //trand_avg = 0;
-    //tappl_avg = 0;
-    //trewd_avg = 0;
-    //int total_move_count = 0;
+
+    //printf( "%s\n\n", gss->toString().c_str() );
+    //cout << "num_open: " << gss->num_open << endl;
+    //for( int j = 0; j<gss->num_open; j++ ){
+    //cout << gss->empty_intersections[j] << ", ";
+    //}
+    //cout << endl;
+
+    //a decent guess at the number of actions taken thus far
+    int n_moves_made = MAX_EMPTY - gss->num_open;
+
+    int avg_move_count = 0;
+    int tries_sum = 0;
+    int tries_copy_sum = 0;
     for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        //t1 = clock();
         GoStateStruct* linear = (GoStateStruct*) gss->copy();
 
+
+        //printf( "%s\n\n", linear->toString().c_str() );
+        //cout << "num_open: " << linear->num_open << endl;
+        //for( int j = 0; j<linear->num_open; j++ ){
+        //cout << linear->empty_intersections[j] << ", ";
+            //}
+            //cout << endl;
+            
+          
         //NOTE: Turn timing off when OpenMP used, clock() synchronizes
         //      in the kernel and slows everything down
-        //t1b = clock();
-        //tcopy_avg += t1b-t1;
         BitMask to_exclude;
         int move_count = 0;
-        while( move_count < MAX_MOVES && !linear->isTerminal() ){
-            //t2 = clock();
+        while( move_count < MAX_MOVES-n_moves_made && 
+               !linear->isTerminal() ){
+            //cout << "empty positions: " << linear->num_open << endl;
+            //cout << linear->toString() << endl;
+            //GoStateStruct* linear_copy = linear->copy();
+            //int tries = 0;
             int action = linear->randomAction( &to_exclude, true );
+            //cout << "tries: " << tries << endl;
+            //tries_sum += tries;
 
-            //t2b = clock();
-            //trand_avg += t2b-t2;
+            //int tries_copy = 0;
+            //int action_copy = linear_copy->randomAction2( &to_exclude, true, &tries_copy );
+            //cout << "action found: " << action << endl;
+            //cout << "tries_copy: " << tries_copy << endl <<endl;
+            //tries_copy_sum += tries_copy;
+            //assert( tries_copy == tries );
+            //delete linear_copy;
 
+            //if( linear->num_open < 260 ){
             //printf( "%s\n\n", linear->toString().c_str() );
             //cout << "hit any key..." << endl;
             //cin.ignore();
+            //}
 
-            //t3b = clock();
-            //tappl_avg += t3b-t3;
             move_count++;
         }
-        //cout << "after sim: " << linear->toString() << endl;
+        avg_move_count += move_count;
 
         int rewards[2];
-        //int t4 = clock();
         linear->getRewards( rewards );
         delete linear;
-        //int t4b = clock();
-        //trewd_avg += t4b - t4;
         if( rewards[0] == 1 ){
             white_win++;
         }
         else if( rewards[1] == 1 ){
             black_win++;
         }
-        //printf("rewards[0]: %d, rewards[1]: %d\n", rewards[0], rewards[1] );
+        //cout << "===========================" << endl;
     }
-    int tb = clock();
-    printf("time taken is: %f\n", ((float) tb-ta)/CLOCKS_PER_SEC);
-    //printf("copy time: %f\n", ((float) tcopy_avg)/CLOCKS_PER_SEC);
-    //printf("rand time: %f\n", ((float) trand_avg)/CLOCKS_PER_SEC);
-    //printf("avg rewd time: %f\n", ((float) trewd_avg)/CLOCKS_PER_SEC);
-
-    //printf( "dev white win count: %d\n", white_win_dev );
-    //printf( "host white win count: %d\n", white_win_host );
-
-    //assert( white_win+black_win == NUM_SIMULATIONS );
+    //cout << "tries: " << tries_sum << " tries_copy: " << tries_copy_sum << endl;
+    //cout << "avg move count: " << (float) avg_move_count / NUM_SIMULATIONS << endl;
+    assert( white_win+black_win == NUM_SIMULATIONS );
     rewards[0] = white_win;
     rewards[1] = black_win;
-
-    return 0;
 }
 
 //DEPRECATED

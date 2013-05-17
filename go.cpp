@@ -9,13 +9,18 @@
 //just for direct timing/testing launchSimulationKernel
 #include "kernel.h"
 
+//parallel
 #include <omp.h>
 
 #include <assert.h>
 #include <iostream>
 #include <time.h>
 #include <stdint.h>
+#include <time.h>
+
+//hard coded data
 #include "weights.h"
+#include "board_100th.h"
 
 //value function
 #include "value_functions/value2.h"
@@ -37,45 +42,59 @@ int main(){
     //zobrist testing
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
+    
+    //mclInitializeApplication(NULL,0);
+    //value2Initialize();
+
 
     //testing the linking of MATLAB compiled code to do value computation
-    if( true ){
+    if( false ){
         //input
         //TODO, do this once somewhere, weights.h?
         //Wasteful right now, but not the bottleneck
         //
-        mclInitializeApplication(NULL,0);
-                //
-        value2Initialize();
         //
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
         MCTS_Node* dummy_node = new MCTS_Node( 2, BOARDSIZE );
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
+        gss->MATLAB2board( game1234 );
+        cout << gss->toString() << endl;
         ///set board to example?
         cout << "here" << endl;
         MCTS_Node* return_node1 = mcts.valuePolicy( dummy_node, gss );
 
-        ////Causing double free errors...???
-        value2Terminate();
-        mclTerminateApplication();
     }
         //
         //
-    ////playout simulation performance timing
-    //if( false ){
-    //GoStateStruct* gss = new GoStateStruct;
-    //gss->ctor(zh);
-    //
-    ////BitMask* to_exclude = new BitMask;
-    ////int action = gss->randomAction( to_exclude, false );
-    //int rewards[2];
-    //launchSimulationKernel( gss, rewards );
-    //}
+        //playout simulation performance timing
+    if( false ){
+        GoStateStruct* gss = new GoStateStruct;
+        gss->ctor(zh);
+
+        //cout << "num open" << gss->num_open << endl;
+        //for( int j = 0; j<gss->num_open; j++ ){
+        //cout << gss->empty_intersections[j] << ", ";
+        //}
+        int rewards[2];
+        clock_t t1,t2;
+
+        //gss->MATLAB2board( game1234 );
+        //BitMask* to_exclude = new BitMask;
+        //while( gss->num_open >= 160 ){
+        //int action = gss->randomAction( to_exclude, true );
+        //}
+        //cout << "random board with 100 played" << gss->toString() << endl;
+        t1 = clock();
+        launchSimulationKernel( gss, rewards );
+        t2 = clock();
+        cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+    }
     
     //play a full MCTS game
-    if( false ){
+    if( true ){
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
 
@@ -83,24 +102,26 @@ int main(){
         gs->ctor(zh);
         //void* uncast_state = (void*) gs;
 
-        int nthreads = 4;
         int tid;
         int best_action;
 
-        MCTS_Node** search_trees = new MCTS_Node* [nthreads];
-        GoStateStruct** states = new GoStateStruct* [nthreads];
+        MCTS_Node** search_trees = new MCTS_Node* [NTHREADS];
+        GoStateStruct** states = new GoStateStruct* [NTHREADS];
 
-        while( !domain->isTerminal( gs ) ){
+        int nmoves = 0;
+        clock_t total_time_1 = clock();
+        while( nmoves <= MAX_MOVES && !domain->isTerminal( gs ) ){
             //initialize each thread's copy of state
-            for( int i=0; i<nthreads; i++ ){
+            clock_t t1 = clock();
+            for( int i=0; i<NTHREADS; i++ ){
                 states[i] = gs->copy();
             }
-
+ 
             //do parallel tree search
             #pragma omp parallel for shared(states, search_trees) \
                                      private(tid) \
-                                     num_threads(nthreads)
-            for(int tid=0; tid<nthreads; tid++){
+                                     num_threads(NTHREADS)
+            for(int tid=0; tid<NTHREADS; tid++){
                 search_trees[tid] = mcts.search( (void*) states[tid] );
             }
 
@@ -115,7 +136,7 @@ int main(){
                     agg_child = search_trees[0]->children[ix];
                 }
                 
-                for( int tid=0; tid<nthreads; tid++ ){
+                for( int tid=0; tid<NTHREADS; tid++ ){
                     if( search_trees[tid]->tried_actions->get(ix) ){
                         MCTS_Node* child = search_trees[tid]->children[ix];
                         agg_child->total_rewards[0] += child->total_rewards[0];
@@ -130,22 +151,36 @@ int main(){
                                               pix, 
                                               true )->action;
 
-            cout << "best action for player: " << pix << " is: " << best_action << endl;
-            cout << "hit any key..." << endl;
-            cin.ignore();
+            //cout << "best action for player: " << pix << " is: " << best_action << endl;
 
             //clean up
-            for( int tid=0; tid<nthreads; tid++ ){
+            for( int tid=0; tid<NTHREADS; tid++ ){
                 delete search_trees[tid];
             }
             
             //apply to uncast_state
             //assert best_action is legal
             bool legal = domain->applyAction( gs, best_action, true );
+            cout << "After the " << nmoves << " move, " << endl << gs->toString() << endl;
             assert(legal);
+            clock_t t2 = clock();
+            cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+            //cout << "hit any key..." << endl;
+            //cin.ignore();
+            nmoves++;
         }
+        int rewards[2];
+        domain->getRewards( rewards, (void *) gs );
+        cout << "Black Wins: " << rewards[1] << endl;
+        cout << "total time taken: " << ((float) (clock()-total_time_1)) / CLOCKS_PER_SEC << endl;
+        //do something with the results
     }
-    
+   
+    ////Causing double free errors...???
+    //value2Terminate();
+    //mclTerminateApplication();
+
     //test basic random and apply functionality on pre-configured boards
     if( false ){
         
