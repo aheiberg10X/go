@@ -26,8 +26,12 @@ public :
         //return ((GoState*) state)->boardsize;
     }
 
-    int getNumPlayers( void* state ){
+    const int getNumPlayers( void* state ){
         return 2; 
+    }
+
+    int movesMade( void* state ){
+        return MAX_EMPTY - ((GoStateStruct*) state)->num_open;
     }
 
     int getPlayerIx( void* state ){
@@ -70,17 +74,14 @@ public :
     }
     
 
-    //deprecated, in kernel
     void getRewards( int* to_fill,
                      void* uncast_state ){
         ((GoStateStruct*) uncast_state)->getRewards( to_fill );
     }
     
-    //return an unsigned action, i.e an ix in the board
-    //deprecated, in kernel
     int randomAction( void* uncast_state, 
-                      BitMask* to_exclude ){
-        bool side_effects = false;
+                      BitMask* to_exclude,
+                      bool side_effects ){
         return ((GoStateStruct*) uncast_state)->randomAction( to_exclude, 
                                                               side_effects);
     }

@@ -19,7 +19,6 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     for( int i=0; i < num_players; i++ ){
         total_rewards[i] = 0;
     }
-    fully_expanded = false;
 }
 
 //for initializing non-root nodes
@@ -48,7 +47,6 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     }
 
     value = 0;
-    fully_expanded = false;
 }
 
 int MCTS_Node::num_nodes_created = 0;

@@ -19,8 +19,6 @@ public :
     int num_actions;
     double value;
 
-    int avoid_false_sharing[128];
-
     //TODO
     //mem waste to maintain both a tried and action:child map
     //but we want ot be able to give random action a to_exclude list
@@ -39,7 +37,7 @@ public :
 
     //tentative
     /*int value;*/
-    bool fully_expanded;
+    /*bool fully_expanded;*/
 
     MCTS_Node(int anum_players, int anum_actions);
 

@@ -74,6 +74,10 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     target->frozen_num_open = frozen_num_open;
     target->zhasher = zhasher;
 
+
+    black_known_illegal.copyInto( &(target->black_known_illegal) );
+    white_known_illegal.copyInto( &(target->white_known_illegal) );
+
     memcpy( target->board, board, BOARDSIZE*sizeof(char) );
     memcpy( target->frozen_board, frozen_board, BOARDSIZE*sizeof(char) );
     memcpy( target->empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
@@ -509,11 +513,31 @@ void GoStateStruct::advancePastStates( int past_zhash,
     
 }
 
+void GoStateStruct::setKnownIllegal( int ix ){
+    if( player == BLACK ){
+        black_known_illegal.set(ix,true);
+    }
+    else {
+        white_known_illegal.set(ix,true);
+    }
+}
+
+bool GoStateStruct::isKnownIllegal( int ix ){
+
+    if( player == BLACK ){
+        return black_known_illegal.get(ix);
+    }
+    else {
+        return white_known_illegal.get(ix);
+    }
+}
+
+
 bool GoStateStruct::applyAction( int action,
                                  bool side_effects ){
+    //cout << "action: " << action << " is border: " << isBorder(action) << "board[ix]:" << board[action] <<  endl;
     if( !isBorder(action) && board[action] != EMPTY ){ 
-        cout << "trying to play: " << action << " but it is not empty, has: " << board[action] << endl;
-        assert(false);
+        //assert(false);
         return false;
     }
     bool legal = true;
@@ -523,6 +547,12 @@ bool GoStateStruct::applyAction( int action,
     //need to convert to signed action i.e BLACK or WHITE ie. *-1 or *1
     int ix = action;
     char color = player;
+    
+    //if( isKnownIllegal( action ) ){
+    ////cout << "known illegal, DENIED!" << endl;
+    //return false;
+    //}
+
     char opp_color = flipColor(color); 
     action = ix2action( ix, color);
     if( ! isPass(action) ){
@@ -565,6 +595,8 @@ bool GoStateStruct::applyAction( int action,
         if( is_eye ){
             //cout << "is eye" << endl;
             legal = false;
+            //setKnownIllegal( ix );
+            //known_illegal.set( ix, true );
         }
         else if( no_orthog_opps_and_liberty ){
             legal = true;
@@ -613,6 +645,8 @@ bool GoStateStruct::applyAction( int action,
                     //connected_to_lib.clear();
                     capture( &marked );
                     capture_made = true;
+                    //black_known_illegal.clear();
+                    //white_known_illegal.clear();
                 }
                 else {
                     //add the marked stones into the ones with liberties
@@ -642,6 +676,7 @@ bool GoStateStruct::applyAction( int action,
                                                              EMPTY );
                             if( fill_completed ) { 
                                 legal = false;
+                                //setKnownIllegal( ix );
                                 //cout << "no lib left" << endl;
                                 break; 
                             }
@@ -836,8 +871,6 @@ int GoStateStruct::randomAction2( BitMask* to_exclude,
         return PASS;
     }
 }
-
-
 
 
 bool GoStateStruct::isTerminal(){
@@ -1177,76 +1210,36 @@ void launchSimulationKernel( GoStateStruct* gss, int* rewards ){
     int white_win = 0;
     int black_win = 0;
 
-    //printf( "%s\n\n", gss->toString().c_str() );
-    //cout << "num_open: " << gss->num_open << endl;
-    //for( int j = 0; j<gss->num_open; j++ ){
-    //cout << gss->empty_intersections[j] << ", ";
-    //}
-    //cout << endl;
-
     //a decent guess at the number of actions taken thus far
     int n_moves_made = MAX_EMPTY - gss->num_open;
-
-    int avg_move_count = 0;
-    int tries_sum = 0;
-    int tries_copy_sum = 0;
+    GoStateStruct* linear = (GoStateStruct*) gss->copy();
     for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        GoStateStruct* linear = (GoStateStruct*) gss->copy();
+        gss->copyInto( linear );
 
-
-        //printf( "%s\n\n", linear->toString().c_str() );
-        //cout << "num_open: " << linear->num_open << endl;
-        //for( int j = 0; j<linear->num_open; j++ ){
-        //cout << linear->empty_intersections[j] << ", ";
-            //}
-            //cout << endl;
-            
-          
         //NOTE: Turn timing off when OpenMP used, clock() synchronizes
         //      in the kernel and slows everything down
         BitMask to_exclude;
         int move_count = 0;
         while( move_count < MAX_MOVES-n_moves_made && 
                !linear->isTerminal() ){
-            //cout << "empty positions: " << linear->num_open << endl;
-            //cout << linear->toString() << endl;
-            //GoStateStruct* linear_copy = linear->copy();
-            //int tries = 0;
             int action = linear->randomAction( &to_exclude, true );
-            //cout << "tries: " << tries << endl;
-            //tries_sum += tries;
 
-            //int tries_copy = 0;
-            //int action_copy = linear_copy->randomAction2( &to_exclude, true, &tries_copy );
-            //cout << "action found: " << action << endl;
-            //cout << "tries_copy: " << tries_copy << endl <<endl;
-            //tries_copy_sum += tries_copy;
-            //assert( tries_copy == tries );
-            //delete linear_copy;
-
-            //if( linear->num_open < 260 ){
             //printf( "%s\n\n", linear->toString().c_str() );
             //cout << "hit any key..." << endl;
             //cin.ignore();
-            //}
-
-            move_count++;
+            ++move_count;
         }
-        avg_move_count += move_count;
 
         int rewards[2];
         linear->getRewards( rewards );
-        delete linear;
         if( rewards[0] == 1 ){
             white_win++;
         }
         else if( rewards[1] == 1 ){
             black_win++;
         }
-        //cout << "===========================" << endl;
     }
-    //cout << "tries: " << tries_sum << " tries_copy: " << tries_copy_sum << endl;
-    //cout << "avg move count: " << (float) avg_move_count / NUM_SIMULATIONS << endl;
+    delete linear;
     assert( white_win+black_win == NUM_SIMULATIONS );
     rewards[0] = white_win;
     rewards[1] = black_win;

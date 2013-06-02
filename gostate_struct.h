@@ -30,6 +30,10 @@ struct GoStateStruct{
     int frozen_num_open;
     int frozen_zhash;
 
+    /*int known_illegal[BOARDSIZE];*/
+    BitMask black_known_illegal;
+    BitMask white_known_illegal;
+
     int past_zhashes[NUM_PAST_STATES];
     //TODO: do we ever use the past actions other than the most recent?
     //No, only use the last action in check inside isTerminal...
@@ -105,6 +109,10 @@ struct GoStateStruct{
     void setBoard( int ix, char color );
 
     void setBoard( int* ixs, int len, char color );
+
+    void setKnownIllegal( int ix );
+
+    bool isKnownIllegal( int ix );
     
     void capture( BitMask* bm );
 

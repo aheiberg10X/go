@@ -12,11 +12,12 @@
 
 class Domain {
     public :
-        virtual int getNumPlayers( void* state ) = 0;
+        virtual const int getNumPlayers( void* state ) = 0;
         virtual int getNumActions( void* state ) = 0;
         virtual int getPlayerIx( void* state ) = 0;
+        virtual int movesMade( void* state ) = 0;
 
-        virtual void copyStateInto( void* source, void* targer ) = 0;
+        virtual void copyStateInto( void* source, void* target ) = 0;
         virtual void* copyState( void* source ) = 0;
         virtual void deleteState( void* state ) = 0;
 
@@ -28,7 +29,8 @@ class Domain {
                                  void* state ) = 0;
         
         virtual int randomAction( void* state,
-                                  BitMask* to_exclude ) = 0;
+                                  BitMask* to_exclude,
+                                  bool side_effects ) = 0;
         
         virtual bool isTerminal( void* state ) = 0;
 

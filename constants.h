@@ -5,23 +5,24 @@
 
 //Use the GPU? Moved on a l0ong time ago...
 /*#define USE_GPU false*/
-#define NTHREADS 4
+#define N_ROOT_THREADS 1
+#define N_VALUE_THREADS 4
 
 //How many leaf simulations should be performed
-#define NUM_SIMULATIONS 1000
+#define NUM_SIMULATIONS 10000
 
 //How many itertions of MCTS before best move selected?
-#define NUM_ITERATIONS 1000
+#define NUM_ITERATIONS 100
 
 //when doing valuePolicy, use (one of) the best valued action(s) 
 //EGREEDY % of the time
-#define EGREEDY .65
+#define EGREEDY .9
 
 #define BALANCING_CONSTANT (1/sqrt(2))
 
 //GoStateStruct Constants
 //set these
-#define DIMENSION 19
+#define DIMENSION 19 
 
 //Leave these alone
 #define MAX_EMPTY (DIMENSION*DIMENSION)

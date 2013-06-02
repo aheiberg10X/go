@@ -43,8 +43,8 @@ int main(){
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
     
-    //mclInitializeApplication(NULL,0);
-    //value2Initialize();
+    mclInitializeApplication(NULL,0);
+    value2Initialize();
 
 
     //testing the linking of MATLAB compiled code to do value computation
@@ -69,32 +69,33 @@ int main(){
         //
         //
         //playout simulation performance timing
-    if( false ){
+    if( true ){
         GoStateStruct* gss = new GoStateStruct;
         gss->ctor(zh);
 
-        //cout << "num open" << gss->num_open << endl;
-        //for( int j = 0; j<gss->num_open; j++ ){
-        //cout << gss->empty_intersections[j] << ", ";
-        //}
+        Domain* domain = (Domain*) new GoDomain();
+        MCTS mcts(domain);
+
         int rewards[2];
         clock_t t1,t2;
 
         //gss->MATLAB2board( game1234 );
         //BitMask* to_exclude = new BitMask;
-        //while( gss->num_open >= 160 ){
+        //for( int i=0; i<300; i++ ){
         //int action = gss->randomAction( to_exclude, true );
         //}
         //cout << "random board with 100 played" << gss->toString() << endl;
+        cout << "num open: " << gss->num_open << endl;
         t1 = clock();
-        launchSimulationKernel( gss, rewards );
+        mcts.defaultPolicy( rewards, (void *) gss );
+        //launchSimulationKernel( gss, rewards );
         t2 = clock();
         cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
 
     }
     
     //play a full MCTS game
-    if( true ){
+    if( false ){
         Domain* domain = (Domain*) new GoDomain();
         MCTS mcts(domain);
 
@@ -105,23 +106,24 @@ int main(){
         int tid;
         int best_action;
 
-        MCTS_Node** search_trees = new MCTS_Node* [NTHREADS];
-        GoStateStruct** states = new GoStateStruct* [NTHREADS];
+        MCTS_Node** search_trees = new MCTS_Node* [N_ROOT_THREADS];
+        GoStateStruct** states = new GoStateStruct* [N_ROOT_THREADS];
 
         int nmoves = 0;
         clock_t total_time_1 = clock();
         while( nmoves <= MAX_MOVES && !domain->isTerminal( gs ) ){
             //initialize each thread's copy of state
             clock_t t1 = clock();
-            for( int i=0; i<NTHREADS; i++ ){
+            for( int i=0; i<N_ROOT_THREADS; i++ ){
                 states[i] = gs->copy();
             }
  
             //do parallel tree search
+            //pass in the search tree, sans estimates, from laste iteration?
             #pragma omp parallel for shared(states, search_trees) \
                                      private(tid) \
-                                     num_threads(NTHREADS)
-            for(int tid=0; tid<NTHREADS; tid++){
+                                     num_threads(N_ROOT_THREADS)
+            for( tid=0; tid<N_ROOT_THREADS; tid++){
                 search_trees[tid] = mcts.search( (void*) states[tid] );
             }
 
@@ -136,7 +138,7 @@ int main(){
                     agg_child = search_trees[0]->children[ix];
                 }
                 
-                for( int tid=0; tid<NTHREADS; tid++ ){
+                for( int tid=0; tid<N_ROOT_THREADS; tid++ ){
                     if( search_trees[tid]->tried_actions->get(ix) ){
                         MCTS_Node* child = search_trees[tid]->children[ix];
                         agg_child->total_rewards[0] += child->total_rewards[0];
@@ -153,8 +155,11 @@ int main(){
 
             //cout << "best action for player: " << pix << " is: " << best_action << endl;
 
+            //TODO: deleting the search tries is wasteful
+            //we don't want the other players estimates
+            //but reusing the valuations would be smart
             //clean up
-            for( int tid=0; tid<NTHREADS; tid++ ){
+            for( int tid=0; tid<N_ROOT_THREADS; tid++ ){
                 delete search_trees[tid];
             }
             
@@ -164,7 +169,7 @@ int main(){
             cout << "After the " << nmoves << " move, " << endl << gs->toString() << endl;
             assert(legal);
             clock_t t2 = clock();
-            cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+            //cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
 
             //cout << "hit any key..." << endl;
             //cin.ignore();
@@ -178,8 +183,8 @@ int main(){
     }
    
     ////Causing double free errors...???
-    //value2Terminate();
-    //mclTerminateApplication();
+    value2Terminate();
+    mclTerminateApplication();
 
     //test basic random and apply functionality on pre-configured boards
     if( false ){
