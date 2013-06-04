@@ -3,8 +3,14 @@ INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
 
-all: clean shared
+#all: clean shared
 #all : clean_omp omp
+all : clean_cross cross_corr
+
+######################################################################
+
+cross_corr:
+	nvcc cross_corr_kernel.cu -o cross_kernel
 
 ######################################################################
 
@@ -44,6 +50,9 @@ go.o:
 
 cleango:
 	rm -f go.o go
+
+clean_cross:
+	rm -f cross_kernel cross_corr_kernel.o
 
 clean_omp :
 	rm -f omp omp.o
