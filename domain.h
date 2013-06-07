@@ -3,12 +3,6 @@
 
 #include "bitmask.h"
 #include <string>
-/*#include <set>*/
-/*#include "action.h"*/
-
-//TODO
-//have an action type, instead of strings or ints?
-//no simpler the better
 
 class Domain {
     public :

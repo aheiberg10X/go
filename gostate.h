@@ -5,6 +5,7 @@
 #include "queue.h"
 #include "bitmask.h"
 #include "zobrist.h"
+#include "mcts_state.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +18,8 @@
 
 using namespace std;
 
-struct GoStateStruct{
+class GoState : public MCTS_State {
+private :
     char board[BOARDSIZE];
     ZobristHash* zhasher;
     int zhash;
@@ -61,32 +63,13 @@ struct GoStateStruct{
     uint16_t empty_intersections[MAX_EMPTY];
     uint16_t frozen_empty_intersections[MAX_EMPTY];
 
-    void ctor( ZobristHash* zh);
-    /*~GoStateStruct();   */
-
     void freezeBoard();
 
     void thawBoard();
 
-    void copyInto( GoStateStruct* target );
-
-    GoStateStruct* copy( );
-    
     char flipColor( char c );
 
     void togglePlayer( );
-
-    string toString( );
-
-    string boardToString( char* board );
-
-    void board2MATLAB( double* matlab_board );
-
-    void MATLAB2board( double* matlab_board );
-
-    static int bufferix2nobufferix( int ix );
-
-    static int nobufferix2bufferix( int ix );
 
     int neighbor( int ix, DIRECTION dir);
 
@@ -147,14 +130,52 @@ struct GoStateStruct{
     void advancePastStates( int past_zhash, 
                             int past_action );
 
+
+public :
+    //MCTState Interface
+    const int getNumPlayers();
+
+    int getNumActions();
+
+    int getPlayerIx();
+
+    int movesMade();
+
+    void deleteState();
+
+    void copyInto( MCTS_State* target );
+    void copyInto( GoState* target );
+
+    MCTS_State* copy( );
+
+    bool fullyExpanded( int action );
+
+    bool isChanceAction();
+
     bool applyAction( int action, bool side_effects );
 
     int randomAction( BitMask* to_exclude, bool side_effects );
-    int randomAction2( BitMask* to_exclude, bool side_effects, int* tries );
     
     bool isTerminal();
 
     void getRewards( int* to_fill );
+
+    /////////////////////////////////////////////////////////
+
+    //TODO fix up all ctor uses
+    GoState( ZobristHash* zh);
+
+    string toString( );
+
+    string boardToString( char* board );
+
+    void board2MATLAB( double* matlab_board );
+
+    void MATLAB2board( double* matlab_board );
+
+    static int bufferix2nobufferix( int ix );
+
+    static int nobufferix2bufferix( int ix );
 
     //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/

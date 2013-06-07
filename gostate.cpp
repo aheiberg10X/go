@@ -14,10 +14,22 @@ static uint32_t getRandom(uint32_t * m_z, uint32_t * m_w)
     return (*m_z << 16) + *m_w;
 }
 
-//////////////////////////////////////////////////////////////////////////////
-//                     GoStructState.cu
-/////////////////////////////////////////////////////////////////////////////
-void GoStateStruct::ctor(ZobristHash* zh){
+//interface
+const int GoState::getNumPlayers(){ return 2; }
+int GoState::getNumActions(){ return BOARDSIZE ; }
+int GoState::getPlayerIx(){ return player == WHITE ? 0 : 1; }
+int GoState::movesMade(){ return MAX_MOVES - num_open; }
+void GoState::deleteState(){
+    delete this;
+}
+bool GoState::fullyExpanded( int action ){
+    return action == EXCLUDED_ACTION;
+}
+bool GoState::isChanceAction(){
+    return false;
+}
+
+GoState::GoState(ZobristHash* zh){
     zhasher = zh;
     player = BLACK;
     action = 12345678;
@@ -50,21 +62,21 @@ void GoStateStruct::ctor(ZobristHash* zh){
 
 }
 
-void GoStateStruct::freezeBoard(){
+void GoState::freezeBoard(){
     memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
     memcpy( frozen_empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
     frozen_num_open = num_open;
     frozen_zhash = zhash;
 }
 
-void GoStateStruct::thawBoard(){
+void GoState::thawBoard(){
     memcpy( board, frozen_board, BOARDSIZE*sizeof(char) );
     memcpy( empty_intersections, frozen_empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
     num_open = frozen_num_open;
     zhash = frozen_zhash;
 }
 
-void GoStateStruct::copyInto( GoStateStruct* target ){
+void GoState::copyInto( GoState* target ){
     target->zhash = zhash;
     target->player = player;
     target->action = action;
@@ -85,25 +97,25 @@ void GoStateStruct::copyInto( GoStateStruct* target ){
     memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
 }
 
-GoStateStruct* GoStateStruct::copy(){
-    GoStateStruct* s = (GoStateStruct*) malloc(sizeof(GoStateStruct));
+MCTS_State* GoState::copy(){
+    GoState* s = (GoState*) malloc(sizeof(GoState));
     s->ctor( this->zhasher );
     this->copyInto(s);
-    return s;
+    return (MCTS_State*) s;
 };
 
-char GoStateStruct::flipColor( char c ){
+char GoState::flipColor( char c ){
     //assert( c == WHITE || c == BLACK );
     return (c == WHITE) ? BLACK : WHITE;
 }
 
-void GoStateStruct::togglePlayer() {
+void GoState::togglePlayer() {
     (player == WHITE) ? player = BLACK : player = WHITE;
 }
 
-void GoStateStruct::board2MATLAB( double* matlab_board ){
+void GoState::board2MATLAB( double* matlab_board ){
     for( int i=0; i<BOARDSIZE; i++ ){
-        int nobufferix = GoStateStruct::bufferix2nobufferix( i );
+        int nobufferix = GoState::bufferix2nobufferix( i );
         if( board[i] == OFFBOARD ){
             assert( nobufferix == -1 );
         }
@@ -119,9 +131,9 @@ void GoStateStruct::board2MATLAB( double* matlab_board ){
     }
 }
 
-void GoStateStruct::MATLAB2board( double* matlab_board ){
+void GoState::MATLAB2board( double* matlab_board ){
     for( int ix=0; ix<MAX_EMPTY; ix++ ){
-        int bufferix = GoStateStruct::nobufferix2bufferix(ix);
+        int bufferix = GoState::nobufferix2bufferix(ix);
         if( matlab_board[ix] == -1 ){
             setBoard( bufferix, WHITE );
             //board[bufferix] = WHITE;
@@ -140,7 +152,7 @@ void GoStateStruct::MATLAB2board( double* matlab_board ){
     }
 }
 
-string GoStateStruct::boardToString( char* board ){
+string GoState::boardToString( char* board ){
     stringstream out;
     out << "   ";
     for( int i=0; i<BIGDIM; i++){
@@ -180,7 +192,7 @@ string GoStateStruct::boardToString( char* board ){
     return out.str();
 }
 
-string GoStateStruct::toString(){
+string GoState::toString(){
     string out;
     stringstream ss;
     ss << "Player: " << player << endl;
@@ -193,7 +205,7 @@ string GoStateStruct::toString(){
 }
 
 //TODO this is static, make it so
-int GoStateStruct::bufferix2nobufferix( int ix ){
+int GoState::bufferix2nobufferix( int ix ){
     int row = ix / BIGDIM;
     int col = ix % BIGDIM;
     if( row == 0 || row == BIGDIM-1 || col == 0 || col == BIGDIM-1 ){ 
@@ -204,49 +216,49 @@ int GoStateStruct::bufferix2nobufferix( int ix ){
     }
 }
 
-int GoStateStruct::nobufferix2bufferix( int ix ){
+int GoState::nobufferix2bufferix( int ix ){
     int row = ix / DIMENSION;
     return ix + BIGDIM + 1 + row*2;
 }
 
-int GoStateStruct::ix2action( int ix, char player ){
+int GoState::ix2action( int ix, char player ){
     int parity = player == WHITE ? 1 : -1;
     return ix * parity;
 }
 
-int GoStateStruct::action2ix( int action ){
+int GoState::action2ix( int action ){
     return abs(action);
 }
 
-char GoStateStruct::action2color( int action ){
+char GoState::action2color( int action ){
     //assert( action != 0 );
     return (action > 0) ? WHITE : BLACK;
 }
 
-int GoStateStruct::ix2color( int ix ){
+int GoState::ix2color( int ix ){
     return isBorder(ix) ? OFFBOARD : board[ix];
 }
 
-int GoStateStruct::coord2ix( int i, int j ){
+int GoState::coord2ix( int i, int j ){
     return BIGDIM*i + j;
 }
 
-int GoStateStruct::ixColor2Action( int ix, char color ){
+int GoState::ixColor2Action( int ix, char color ){
     //assert( color==WHITE || color==BLACK );
     int mod = (color == WHITE) ? 1 : -1;
     return ix*mod;
 }
 
-int GoStateStruct::coordColor2Action( int i, int j, char color ){
+int GoState::coordColor2Action( int i, int j, char color ){
     int ix = coord2ix(i,j);
     return ixColor2Action(ix, color);
 }
 
-bool GoStateStruct::isPass( int action ){
+bool GoState::isPass( int action ){
     return action == PASS;
 }
 
-void GoStateStruct::setBoard( int ix, char color ){ 
+void GoState::setBoard( int ix, char color ){ 
     if( ix >= BOARDSIZE || board[ix] == OFFBOARD ){ return; } 
     //if tyring to set the same color as it is, do nothing
     if( color == board[ix] ){ return; }
@@ -280,7 +292,7 @@ void GoStateStruct::setBoard( int ix, char color ){
     board[ix] = color; 
 }
 
-void GoStateStruct::setBoard( int* ixs, int len, char color ){
+void GoState::setBoard( int* ixs, int len, char color ){
     for( int i=0; i<len; i++ ){
         int ix = ixs[i];
         setBoard( ix, color );
@@ -289,7 +301,7 @@ void GoStateStruct::setBoard( int* ixs, int len, char color ){
 
 //if space is no object, why not just have an array with marked values
 //this way don't need to iterate all the way though the 0's
-void GoStateStruct::capture( BitMask* bm ){
+void GoState::capture( BitMask* bm ){
     int nSet = 0;
     int ix = 0;
     while( nSet < bm->count ){
@@ -301,7 +313,7 @@ void GoStateStruct::capture( BitMask* bm ){
     }
 }
 
-bool GoStateStruct::isBorder( int ix ){
+bool GoState::isBorder( int ix ){
     if( ix <= BIGDIM-1 ){ return true; }
     else if( ix % BIGDIM == 0 ){return true; }
     else if( ix % BIGDIM == BIGDIM-1 ){ return true; }
@@ -309,7 +321,7 @@ bool GoStateStruct::isBorder( int ix ){
     else{ return false; }
 }
 
-void GoStateStruct::neighborsOf2( int* to_fill, int* to_fill_len,
+void GoState::neighborsOf2( int* to_fill, int* to_fill_len,
                                   int ix, int adjacency,
                                   char filter_color ){
     if( board[ix] == OFFBOARD ){ return; }
@@ -350,7 +362,7 @@ void GoStateStruct::neighborsOf2( int* to_fill, int* to_fill_len,
     *to_fill_len = fillix;
 }
 
-int GoStateStruct::neighbor( int ix, DIRECTION dir){
+int GoState::neighbor( int ix, DIRECTION dir){
     if( board[ix] == OFFBOARD ){
         return OFFBOARD;
     }
@@ -368,7 +380,7 @@ int GoStateStruct::neighbor( int ix, DIRECTION dir){
     }
 }
 /* deprecated because slow 
-void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
+void GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
     //assert( adjacency==4 || adjacency==8 );
     for( int dir=0; dir<adjacency; dir++ ){
         to_fill[dir] = neighbor( ix, (DIRECTION) dir);
@@ -376,7 +388,7 @@ void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
 }
 */
 
-void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
+void GoState::neighborsOf( int* to_fill, int ix, int adjacency ){
     if( board[ix] == OFFBOARD ){
         memset( to_fill, OFFBOARD, adjacency );
     }
@@ -392,7 +404,7 @@ void GoStateStruct::neighborsOf( int* to_fill, int ix, int adjacency ){
     }
 }
 
-void GoStateStruct::filterByColor( 
+void GoState::filterByColor( 
                     int* to_fill, 
                     int* to_fill_len,
                     int* neighbs,
@@ -420,7 +432,7 @@ void GoStateStruct::filterByColor(
 //returns true if the stop color wasn't found, when flooding 'flood_color' 
 //starting from 'epicenter_ix'
 //fills this->marked BitMask with the stones marked
-bool GoStateStruct::floodFill(  
+bool GoState::floodFill(  
                 int epicenter_ix,
                 int adjacency,
                 char flood_color,
@@ -491,14 +503,14 @@ bool GoStateStruct::floodFill(
 }
 
 //TODO much faster if we have access to a hash_map O(n) -> O(1)
-bool GoStateStruct::isDuplicatedByPastState(){
+bool GoState::isDuplicatedByPastState(){
     for( int i=NUM_PAST_STATES-1; i>=0; i-- ){
         if( zhash == past_zhashes[i] ){ return true; break; }
     }
     return false;
 }
 
-void GoStateStruct::advancePastStates( int past_zhash,  
+void GoState::advancePastStates( int past_zhash,  
                                        int past_action ){
     //TODO: how to faster?  can't use memcpy on overlapping regions, 
     //cant use memmove on cuda
@@ -512,7 +524,7 @@ void GoStateStruct::advancePastStates( int past_zhash,
     
 }
 
-void GoStateStruct::setKnownIllegal( int ix ){
+void GoState::setKnownIllegal( int ix ){
     if( player == BLACK ){
         black_known_illegal.set(ix,true);
     }
@@ -521,7 +533,7 @@ void GoStateStruct::setKnownIllegal( int ix ){
     }
 }
 
-bool GoStateStruct::isKnownIllegal( int ix ){
+bool GoState::isKnownIllegal( int ix ){
 
     if( player == BLACK ){
         return black_known_illegal.get(ix);
@@ -532,7 +544,7 @@ bool GoStateStruct::isKnownIllegal( int ix ){
 }
 
 
-bool GoStateStruct::applyAction( int action,
+bool GoState::applyAction( int action,
                                  bool side_effects ){
     //cout << "action: " << action << " is border: " << isBorder(action) << "board[ix]:" << board[action] <<  endl;
     if( !isBorder(action) && board[action] != EMPTY ){ 
@@ -731,7 +743,7 @@ bool GoStateStruct::applyAction( int action,
     }  
 }
 
-int GoStateStruct::randomAction( BitMask* to_exclude,
+int GoState::randomAction( BitMask* to_exclude,
                                  bool side_effects ){
     int end = num_open-1;
     //cout << "num_open: " << num_open << endl;
@@ -801,83 +813,12 @@ int GoStateStruct::randomAction( BitMask* to_exclude,
     }
 }
 
-int GoStateStruct::randomAction2( BitMask* to_exclude,
-                                 bool side_effects, int* tries ){
-    int end = num_open-1;
-    //cout << "num_open: " << num_open << endl;
-    //for( int i=0; i<num_open; i++ ){
-    //cout << "empty[" << i << "]: " << empty_intersections[i] << endl;
-    //}
-    uint32_t r;
-
-    //cout << "num open: " << num_open << endl;
-
-    bool legal_but_excluded_move_available = false;
-    while( end >= 0 ){
-        (*tries)++;
-        //if( tries > 1 ){
-        //cout << "    tries: " << tries << endl;
-        //} 
-        //NOTE: can't use rand() because it causes kernel blocking
-        //      not good when trying to parallelize
-        //r = rand() % (end+1);
-        //r = end;
-        r = getRandom(&m_z,&m_w) % (end+1);
-        
-        //swap empty[end] and empty[r]
-        int temp = empty_intersections[end];
-        empty_intersections[end] = empty_intersections[r];
-        empty_intersections[r] = temp;
-
-        //swap empty[end] to empty[num_open-1]
-        //this is for a speedup to setBoard
-        temp = empty_intersections[num_open-1];
-        empty_intersections[num_open-1] = empty_intersections[end];
-        empty_intersections[end] = temp;
-        
-        //test whether the move legal and not excluded
-        //return intersection if so
-        int candidate = empty_intersections[num_open-1];
-        bool ix_is_excluded = to_exclude->get(candidate);
-        if( legal_but_excluded_move_available ){
-            if( ! ix_is_excluded ){
-                bool is_legal = applyAction( candidate, side_effects );
-                if( is_legal ){
-                    return candidate;
-                }
-            }
-        }
-        else{
-            bool is_legal = applyAction( candidate, 
-                                         side_effects && !ix_is_excluded);
-            if( is_legal ){
-                if( ix_is_excluded ){
-                    legal_but_excluded_move_available = true;
-                }
-                else{
-                    return candidate;
-                }
-            }
-        }
-
-        //if did not return a legal move, keep going
-        end--;
-    }
-    
-    if( legal_but_excluded_move_available ){ return EXCLUDED_ACTION; }
-    else { 
-        applyAction( PASS, side_effects );
-        return PASS;
-    }
-}
-
-
-bool GoStateStruct::isTerminal(){
+bool GoState::isTerminal(){
     bool r = action == PASS && past_action == PASS;
     return r;
 }
 
-void GoStateStruct::getRewards( int* to_fill ){
+void GoState::getRewards( int* to_fill ){
     int white_score = 0;
     int black_score = 0;
     for( int ix=0; ix < BOARDSIZE; ix++ ){
@@ -943,7 +884,7 @@ void GoStateStruct::getRewards( int* to_fill ){
 //will need to rework this if ever use playouts where it is not the case that 
 //only single empty positions are left
 /*
- void GoStateStruct::getRewardsComplete( int* to_fill ){
+ void GoState::getRewardsComplete( int* to_fill ){
     //TODO use state's bitmask
     BitMask marked; //( state->boardsize );
 

@@ -22,8 +22,8 @@ omp:
 benchmark: kernel.o 
 	${CMPLR} -o kernel kernel.o ${CFLAGS}
 
-shared: kernel.o godomain.o mcts.o go.o
-	${CMPLR} -o kernel godomain.o kernel.o mcts.o mcts_node.o go.o ${CFLAGS} \
+shared: kernel.o mcts.o go.o
+	${CMPLR} -o kernel kernel.o mcts.o mcts_node.o go.o ${CFLAGS} \
 	-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
 	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
 
@@ -38,8 +38,10 @@ mcts.o : mcts_node.o
 mcts_node.o: 
 	${CMPLR} -c mcts_node.cpp ${CFLAGS}
 
-godomain.o: 
-	${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
+#godomain.o: 
+	#${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
+
+
 
 go.o:
 	${CMPLR} -c go.cpp ${INC} ${CFLAGS} \

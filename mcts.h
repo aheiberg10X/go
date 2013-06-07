@@ -3,6 +3,7 @@
 
 #include <string>
 #include "mcts_node.h"
+#include "mcst_state.h"
 #include "domain.h"
 
 class MCTS {
@@ -14,23 +15,23 @@ public :
     MCTS( Domain* domain );
 
     //returns an action
-    MCTS_Node* search( void* root_state );
+    MCTS_Node* search( MCTS_State* root_state );
 
     MCTS_Node* treePolicy( MCTS_Node* node, 
-                           void*      state );
+                           MCTS_State*      state );
 
     MCTS_Node* randomPolicy( MCTS_Node* node, 
-                             void*      state );
+                             MCTS_State*      state );
 
     MCTS_Node* valuePolicy( MCTS_Node* node,
-                              void*      state );
+                              MCTS_State*      state );
 
     MCTS_Node* uctPolicy( MCTS_Node* node, 
-                          void*      state );
+                          MCTS_State*      state );
 
     //side effect: updates pstate by applying action
     MCTS_Node* expand( MCTS_Node* parent, 
-                       void*      pstate, 
+                       MCTS_State*      pstate, 
                        int        action );
 
     float scoreNode( MCTS_Node* node, 
@@ -43,7 +44,7 @@ public :
                           bool       just_exploitation );
 
     void defaultPolicy( int*    rewards, 
-                        void*   state );
+                        MCTS_State*   state );
 
     /*void launchSimulationKernel();*/
 
