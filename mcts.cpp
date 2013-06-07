@@ -4,7 +4,7 @@
 #include <math.h>
 
 //for debugging
-#include "gostate_struct.h"
+#include "gostate.h"
 #include "kernel.h"
 
 //value function
@@ -48,7 +48,8 @@ MCTS_Node* MCTS::search( void* root_state ){
         //TODO
         //break in domain/state interface
         //keep for speed?  less abstraction to call through this way
-        launchSimulationKernel( (GoStateStruct*) state, rewards );
+        defaultPolicy( rewards, state );
+        //launchSimulationKernel( (GoStateStruct*) state, rewards );
         //cout << "rewards w/b: " << rewards[0] << "/" << rewards[1] << endl;
 
         backprop( node, rewards, num_players );
@@ -376,9 +377,10 @@ void MCTS::defaultPolicy( int* total_rewards,
             //int action = linear->randomAction( &to_exclude, true );
             int action = domain->randomAction( scratch_state, &to_exclude, true );
 
-            printf( "%s\n\n", linear->toString().c_str() );
-            cout << "hit any key..." << endl;
-            cin.ignore();
+            //printf( "%s\n\n", linear->toString().c_str() );
+            //cout << "hit any key..." << endl;
+            //cin.ignore();
+
             ++move_count;
         }
 

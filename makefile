@@ -3,9 +3,9 @@ INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
 
-#all: clean shared
+all: clean shared
 #all : clean_omp omp
-all : clean_cross cross_corr
+#all : clean_cross cross_corr
 
 ######################################################################
 
@@ -28,13 +28,12 @@ shared: kernel.o godomain.o mcts.o go.o
 	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
 
 kernel.o:
-	${CMPLR} -c kernel.cpp ${CFLAGS}
+	#${CMPLR} -c kernel.cpp ${CFLAGS}
+	${CMPLR} -c queue.cpp bitmask.cpp gostate.cpp zobrist.cpp ${CFLAGS}
 
 mcts.o : mcts_node.o
 	${CMPLR} -c mcts.cpp ${CFLAGS} \
 	-I/usr/local/MATLAB/R2011b/extern/include/ 
-
-	#g++ -c mcts.cpp ${CFLAGS}
 
 mcts_node.o: 
 	${CMPLR} -c mcts_node.cpp ${CFLAGS}

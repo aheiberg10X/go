@@ -2,11 +2,8 @@
 #define GODOMAIN_H
 
 #include "domain.h"
-//#include "stonestring.h"
 #include <string>
-//#include <map>
-//#include "gostate.h"
-#include "gostate_struct.h"
+#include "gostate.h"
 #include <assert.h>
 #include <iostream>
 

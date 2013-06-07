@@ -1,13 +1,10 @@
 //#include "gostate.h"
-#include "gostate_struct.h"
+#include "gostate.h"
 #include "godomain.cpp"
 #include "mcts.h"
 #include "queue.h"
 #include "bitmask.h"
 #include "zobrist.h"
-
-//just for direct timing/testing launchSimulationKernel
-#include "kernel.h"
 
 //parallel
 #include <omp.h>
