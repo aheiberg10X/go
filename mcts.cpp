@@ -5,7 +5,7 @@
 
 //for debugging
 #include "gostate.h"
-#include "kernel.h"
+//#include "kernel.h"
 
 //value function
 #include "value_functions/value2.h"
@@ -15,48 +15,46 @@
 
 using namespace std;
 
-//ctor
-MCTS::MCTS( Domain* d ){
-    domain = d;
-}
-
 //perform NUM_ITERATIONS iterations of the 4-step MCTS algorithm
 //returns the search_tree, rooted at root_node
-MCTS_Node* MCTS::search( void* root_state ){
-    assert( !domain->isChanceAction( root_state ) );
-
-    int num_players = domain->getNumPlayers( root_state );
-    int num_actions = domain->getNumActions( root_state );
+MCTS_Node* MCTS::search( MCTS_State* root_state ){
+    
+    int num_players = root_state->getNumPlayers();
+    int num_actions = root_state->getNumActions();
     MCTS_Node* root_node = new MCTS_Node( num_players, num_actions );
 
-    //create a copy of root_state, this will be our scratch space
+    //create a copy of root_state, this will be our scratch state-space
+    //as we traverse down the tree.  Every MCTS iteration, restore the 
+    //scratch space to the original root
+    MCTS_State* state = root_state->copy();
     MCTS_Node* node;
+
     int rewards[num_players];
 
     int iterations = 0;
+
     clock_t tree_policy_time, simulation_time;
     clock_t t1,t2;
     t1 = clock();
+
     while( iterations < NUM_ITERATIONS ){
-        void* state = domain->copyState( root_state );
+        root_state->copyInto( state );
         cout << endl << endl << "iteration: " << iterations << endl;
-        //cout << "\n\nroot state: " << ((GoStateStruct*) state)->toString() << endl;
+        //cout << "\n\nroot state: " << state->toString() << endl;
 
+        //(1) and (2)
         node = treePolicy( root_node, state );
-        //cout << "state after tree policy: " << endl; //((GoStateStruct*) state)->toString() << endl;
+        //cout << "state after tree policy: " << state->toString() << endl;
 
-        //TODO
-        //break in domain/state interface
-        //keep for speed?  less abstraction to call through this way
+        //(3)
         defaultPolicy( rewards, state );
-        //launchSimulationKernel( (GoStateStruct*) state, rewards );
         //cout << "rewards w/b: " << rewards[0] << "/" << rewards[1] << endl;
 
+        //(4)
         backprop( node, rewards, num_players );
         iterations += 1; 
-        domain->deleteState( state );
-
     }
+    state->deleteState();
     t2 = clock();
 
     assert( root_node->is_root );
@@ -65,13 +63,14 @@ MCTS_Node* MCTS::search( void* root_state ){
     return root_node;
 }
 
+//use this to toggle between the different tree policys (random, UCT, value)
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
-                             void*     state ){
+                             MCTS_State*     state ){
 
     //return randomPolicy( node, state );
 
-    int player = domain->getPlayerIx(state);
-    //BLACK uses valueFucntion
+    //the following makes BLACK BLACK uses valueFucntion
+    int player = state->getPlayerIx();
     if( player == 1 ){
         return valuePolicy( node, state );
     }
@@ -80,9 +79,10 @@ MCTS_Node* MCTS::treePolicy( MCTS_Node* node,
     }
 }
 
-//this go specific from the beginning, so won't mind breaking abstraction
+//value function approach to the treePolicy
+//currently using fred's MATLAB impl
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node, 
-                              void* uncast_state ){
+                              MCTS_State* state ){
     //TODO: do this once for the class at the beginning
     //make them class members
     //make the weights vector, from Fred's Training0202.mat
@@ -100,14 +100,15 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
     //this overhead is very small compared to the time spent in mlfValue
     double matlab_board[MAX_EMPTY];
 
-    GoStateStruct* gss = (GoStateStruct *) uncast_state;
+    GoState* gss = (GoState *) state;
 
-    GoStateStruct** working_gss = new GoStateStruct* [N_VALUE_THREADS];
+    GoState** working_gss = new GoState* [N_VALUE_THREADS];
     for( int i=0; i<N_VALUE_THREADS; i++ ){
-       working_gss[i] = new GoStateStruct;
+       working_gss[i] = (GoState*) gss->copy();
+       //new GoState( gss->zhasher );
     }
 
-    while( node->marked && !domain->isTerminal( uncast_state ) ){
+    while( node->marked && !state->isTerminal() ){
         cout << "valuePolicy node: " << node << endl;
         //cout << "what now?" << endl;
         //TODO, what is min valueFunction will take?
@@ -119,7 +120,7 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
         #pragma omp parallel for shared(action_values, gss, working_gss ) \
                                  num_threads(N_VALUE_THREADS)
         for( int action=0; action<BOARDSIZE; action++ ){
-            if( gss->board[action] != EMPTY ){ 
+            if( gss->ix2color(action) != EMPTY ){ 
                 action_values[action] = -1;
                 continue; 
             }
@@ -221,7 +222,7 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
             chosen_action = legal_actions[rix];
         }
         cout << "chosen action: " << chosen_action << endl;
-        domain->applyAction(uncast_state, chosen_action, true );
+        state->applyAction( chosen_action, true );
         //cout << gss->toString() << endl;
         node = node->children[chosen_action];
         //cout << "new node: " << node << " marked: " << node->marked << endl;
@@ -237,33 +238,29 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
 }
 
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
-                               void*     uncast_state ){
+                               MCTS_State*     state ){
     int action;
     MCTS_Node* node = root_node;
     BitMask empty_to_exclude;
     empty_to_exclude.clear();
 
-    while( node->marked && !domain->isTerminal( uncast_state ) ){
-        action = domain->randomAction( uncast_state, 
-                                       &empty_to_exclude,
-                                       true );
-        //cout << "state->action : " << ((GoStateStruct* ) uncast_state)->action << endl;
+    while( node->marked && !state->isTerminal() ){
+        action = state->randomAction( &empty_to_exclude, true );
         if( node->tried_actions->get(action) ){
             node = node->children[action];
         }
         else{
             node = new MCTS_Node( node, action );
         }
-        //cout << "node: " << node << endl;
     }
     node->marked = true;
     return node;
 }
 
 MCTS_Node* MCTS::uctPolicy( MCTS_Node* node, 
-                            void*    state ){
-    while( node->marked and !domain->isTerminal( state ) ){
-        int action = domain->randomAction( state, node->tried_actions, true );
+                            MCTS_State*    state ){
+    while( node->marked and !state->isTerminal() ){
+        int action = state->randomAction( node->tried_actions, true );
         //TODO break in abstraction
         bool fully_expanded = action == EXCLUDED_ACTION; 
         if( !fully_expanded ){
@@ -272,22 +269,14 @@ MCTS_Node* MCTS::uctPolicy( MCTS_Node* node,
             //node = expand( node, state, action );
         }
         else{
-            int player_ix = domain->getPlayerIx(state);
+            int player_ix = state->getPlayerIx();
             node = bestChild( node, player_ix, false );
-            bool is_legal = domain->applyAction( state, node->action, true );
+            bool is_legal = state->applyAction( node->action, true );
         }
     }    
     node->marked = true;
     return node;
 }
-
-//MCTS_Node* MCTS::expand( MCTS_Node* parent, 
-//void*      pstate, 
-//int        action ){
-//bool is_legal = domain->applyAction( pstate, action, true );
-//assert(is_legal);
-//return new MCTS_Node( parent, action );
-//}
 
 float MCTS::scoreNode( MCTS_Node* node, 
                      MCTS_Node* parent, 
@@ -350,34 +339,31 @@ MCTS_Node* MCTS::bestChild( MCTS_Node* parent,
 
 }
 
-/*deprecated by launchSimulationKernel */
 void MCTS::defaultPolicy( int* total_rewards, 
-                          void* uncast_state ){
-    const int nplayers = domain->getNumPlayers( uncast_state );
+                          MCTS_State* state ){
+    const int nplayers = state->getNumPlayers();
     int total_results[nplayers];
 
-    void* scratch_state = domain->copyState( uncast_state );
-
+    MCTS_State* scratch_state = state->copy();
+S
     //a decent guess at the number of actions taken thus far
-    int n_moves_made = domain->movesMade( uncast_state );
-    //int n_moves_made = MAX_EMPTY - gss->num_open;
-
+    int n_moves_made = state->movesMade();
     for( int i=0; i<NUM_SIMULATIONS; i++ ){
-        //GoStateStruct* linear = (GoStateStruct*) gss->copy();
-        domain->copyStateInto( uncast_state, scratch_state );
+        state->copyInto( scratch_state );
 
         //NOTE: Turn timing off when OpenMP used, clock() synchronizes
         //      in the kernel and slows everything down
         BitMask to_exclude;
         int move_count = 0;
         //TODO: MAX_MOVES is domain dependent, break in abstraction
-        while( move_count < MAX_MOVES-n_moves_made && 
-               !domain->isTerminal( scratch_state ) ){
-            //!linear->isTerminal() ){
-            //int action = linear->randomAction( &to_exclude, true );
-            int action = domain->randomAction( scratch_state, &to_exclude, true );
+        //HUGE time difference between MAX_EMPTY and MAX_MOVES
+        //is MAX_EMPTY enough moves for a game to be "resolved"
+        //while( move_count < MAX_MOVES-n_moves_made && 
+        while( move_count < MAX_EMPTY-n_moves_made && 
+               !scratch_state->isTerminal() ){
+            int action = scratch_state->randomAction( &to_exclude, true );
 
-            //printf( "%s\n\n", linear->toString().c_str() );
+            //printf( "%s\n\n", scratch_state->toString().c_str() );
             //cout << "hit any key..." << endl;
             //cin.ignore();
 
@@ -385,8 +371,7 @@ void MCTS::defaultPolicy( int* total_rewards,
         }
 
         int rewards[nplayers];
-        //linear->getRewards( rewards );
-        domain->getRewards( rewards, scratch_state );
+        scratch_state->getRewards( rewards );
         for( int p=0; p<nplayers; ++p ){
             total_rewards[p] += rewards[p];
         }
@@ -408,4 +393,47 @@ void MCTS::backprop( MCTS_Node* node,
     }
     return;
 }
+
+//deprecated
+/*
+void MCTS::launchSimulationKernel( GoState* gss, int* rewards ){
+    int white_win = 0;
+    int black_win = 0;
+
+    //a decent guess at the number of actions taken thus far
+    int n_moves_made = gss->movesMade(); //MAX_EMPTY - gss->num_open;
+    GoState* linear = (GoState*) gss->copy();
+    for( int i=0; i<NUM_SIMULATIONS; i++ ){
+        gss->copyInto( linear );
+
+        //NOTE: Turn timing off when OpenMP used, clock() synchronizes
+        //      in the kernel and slows everything down
+        BitMask to_exclude;
+        int move_count = 0;
+        while( move_count < MAX_MOVES-n_moves_made && 
+               !linear->isTerminal() ){
+            int action = linear->randomAction( &to_exclude, true );
+
+            //printf( "%s\n\n", linear->toString().c_str() );
+            //cout << "hit any key..." << endl;
+            //cin.ignore();
+            ++move_count;
+        }
+
+        int rewards[2];
+        linear->getRewards( rewards );
+        if( rewards[0] == 1 ){
+            white_win++;
+        }
+        else if( rewards[1] == 1 ){
+            black_win++;
+        }
+    }
+    delete linear;
+    assert( white_win+black_win == NUM_SIMULATIONS );
+    rewards[0] = white_win;
+    rewards[1] = black_win;
+}
+*/
+
 

@@ -79,7 +79,6 @@ private :
 
     char action2color( int action );
 
-    int ix2color( int ix );
 
     int coord2ix( int i, int j );
 
@@ -159,13 +158,13 @@ public :
     bool isTerminal();
 
     void getRewards( int* to_fill );
+    
+    string toString( );
 
     /////////////////////////////////////////////////////////
 
     //TODO fix up all ctor uses
     GoState( ZobristHash* zh);
-
-    string toString( );
 
     string boardToString( char* board );
 
@@ -176,6 +175,8 @@ public :
     static int bufferix2nobufferix( int ix );
 
     static int nobufferix2bufferix( int ix );
+    
+    int ix2color( int ix );
 
     //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/

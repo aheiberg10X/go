@@ -14,17 +14,20 @@ static uint32_t getRandom(uint32_t * m_z, uint32_t * m_w)
     return (*m_z << 16) + *m_w;
 }
 
-//interface
 const int GoState::getNumPlayers(){ return 2; }
+
 int GoState::getNumActions(){ return BOARDSIZE ; }
+
 int GoState::getPlayerIx(){ return player == WHITE ? 0 : 1; }
-int GoState::movesMade(){ return MAX_MOVES - num_open; }
-void GoState::deleteState(){
-    delete this;
-}
+
+int GoState::movesMade(){ return MAX_EMPTY - num_open; }
+
+void GoState::deleteState(){ delete this; }
+
 bool GoState::fullyExpanded( int action ){
     return action == EXCLUDED_ACTION;
 }
+
 bool GoState::isChanceAction(){
     return false;
 }
@@ -37,7 +40,6 @@ GoState::GoState(ZobristHash* zh){
     frozen_zhash = 0;
     num_open = 0;
     frozen_num_open = 0;
-    //cout << "gss ctor called:" << endl;
     for( int i=0; i<BOARDSIZE; i++ ){
         if( i < BIGDIM || 
             i % BIGDIM == 0 || 
@@ -63,17 +65,33 @@ GoState::GoState(ZobristHash* zh){
 }
 
 void GoState::freezeBoard(){
-    memcpy( frozen_board, board, BOARDSIZE*sizeof(char) );
-    memcpy( frozen_empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
+    memcpy( frozen_board, 
+            board, 
+            BOARDSIZE*sizeof(char) );
+
+    memcpy( frozen_empty_intersections, 
+            empty_intersections, 
+            MAX_EMPTY*sizeof(uint16_t) );
+
     frozen_num_open = num_open;
     frozen_zhash = zhash;
 }
 
 void GoState::thawBoard(){
-    memcpy( board, frozen_board, BOARDSIZE*sizeof(char) );
-    memcpy( empty_intersections, frozen_empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
+    memcpy( board, 
+            frozen_board, 
+            BOARDSIZE*sizeof(char) );
+
+    memcpy( empty_intersections, 
+            frozen_empty_intersections, 
+            MAX_EMPTY*sizeof(uint16_t) );
+
     num_open = frozen_num_open;
     zhash = frozen_zhash;
+}
+
+void GoState::copyInto( MCTS_State* target ){
+    this->copyInto( (GoState*) target );
 }
 
 void GoState::copyInto( GoState* target ){
@@ -85,21 +103,20 @@ void GoState::copyInto( GoState* target ){
     target->frozen_num_open = frozen_num_open;
     target->zhasher = zhasher;
 
-
-    black_known_illegal.copyInto( &(target->black_known_illegal) );
-    white_known_illegal.copyInto( &(target->white_known_illegal) );
+    //black_known_illegal.copyInto( &(target->black_known_illegal) );
+    //white_known_illegal.copyInto( &(target->white_known_illegal) );
 
     memcpy( target->board, board, BOARDSIZE*sizeof(char) );
     memcpy( target->frozen_board, frozen_board, BOARDSIZE*sizeof(char) );
     memcpy( target->empty_intersections, empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
     memcpy( target->frozen_empty_intersections, frozen_empty_intersections, MAX_EMPTY*sizeof(uint16_t) );
 
+    //target->zhash = zhash;
     memcpy( target->past_zhashes, past_zhashes, NUM_PAST_STATES*sizeof(int) );
 }
 
 MCTS_State* GoState::copy(){
-    GoState* s = (GoState*) malloc(sizeof(GoState));
-    s->ctor( this->zhasher );
+    GoState* s = new GoState( this->zhasher );
     this->copyInto(s);
     return (MCTS_State*) s;
 };
@@ -320,6 +337,7 @@ bool GoState::isBorder( int ix ){
     else if( BIGDIM*(BIGDIM-1) <= ix ){return true;}
     else{ return false; }
 }
+
 
 void GoState::neighborsOf2( int* to_fill, int* to_fill_len,
                                   int ix, int adjacency,
@@ -546,9 +564,7 @@ bool GoState::isKnownIllegal( int ix ){
 
 bool GoState::applyAction( int action,
                                  bool side_effects ){
-    //cout << "action: " << action << " is border: " << isBorder(action) << "board[ix]:" << board[action] <<  endl;
     if( !isBorder(action) && board[action] != EMPTY ){ 
-        //assert(false);
         return false;
     }
     bool legal = true;
@@ -637,6 +653,7 @@ bool GoState::applyAction( int action,
             adjacency = 4;
             neighborsOf2( filtered_array, &len, 
                           ix, adjacency, opp_color );
+
             //deprecated, seems overhead didn't make the short-circuit worth it
             //TODO: test more thoroughly on 19x19 though
             //as we explored the opp_color neighbors of the recently placed
@@ -645,6 +662,7 @@ bool GoState::applyAction( int action,
             //runs into stones of the first that have a lib, we can short
             //circuit
             //connected_to_lib.clear();
+            
             bool capture_made = false;
             for( int onix=0; onix < len; onix++ ){
                 marked.clear();
@@ -746,22 +764,10 @@ bool GoState::applyAction( int action,
 int GoState::randomAction( BitMask* to_exclude,
                                  bool side_effects ){
     int end = num_open-1;
-    //cout << "num_open: " << num_open << endl;
-    //for( int i=0; i<num_open; i++ ){
-    //cout << "empty[" << i << "]: " << empty_intersections[i] << endl;
-    //}
     uint32_t r;
 
-    //cout << "num open: " << num_open << endl;
-
     bool legal_but_excluded_move_available = false;
-    int tries = 0;
     while( end >= 0 ){
-        tries++;
-        //if( tries > 1 ){
-        //cout << "    tries: " << tries << endl;
-        //} 
-        //TODO: rand can generate a 0 move here, PASS when we don't want it
         //NOTE: can't use rand() because it causes kernel blocking
         //      not good when trying to parallelize
         //r = rand() % (end+1);
@@ -843,19 +849,16 @@ void GoState::getRewards( int* to_fill ){
         //
 
         int adjacency = 4;
-        //int neighbs[adjacency];
         neighborsOf( neighbor_array,
                      ix,
                      adjacency );
         int* white_neighbs = filtered_array;
-        //int white_neighbs[adjacency];
         int num_white_neighbs = 0;
         char filter_colors[1] = {WHITE};
         filterByColor( white_neighbs, &num_white_neighbs,
                        neighbor_array, adjacency, 
                        filter_colors, 1 );
 
-        //int black_neighbs[adjacency];
         int* black_neighbs = internal_filtered_array;
         int num_black_neighbs = 0;
         filter_colors[0] = BLACK;

@@ -1,6 +1,6 @@
 //#include "gostate.h"
 #include "gostate.h"
-#include "godomain.cpp"
+//#include "godomain.cpp"
 #include "mcts.h"
 #include "queue.h"
 #include "bitmask.h"
@@ -30,7 +30,7 @@ int main(){
     //cout << sizeof(int) << endl;
     //cout << sizeof(char) << endl;
     cout << sizeof(bool) << endl;
-    cout << sizeof(GoStateStruct) << endl;
+    cout << sizeof(GoState) << endl;
     cout << sizeof(uint8_t) << endl;
     cout << sizeof(uint64_t) << endl;
     //cout << PAST_STATE_SIZE << endl;
@@ -40,8 +40,8 @@ int main(){
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
     
-    mclInitializeApplication(NULL,0);
-    value2Initialize();
+    //mclInitializeApplication(NULL,0);
+    //value2Initialize();
 
 
     //testing the linking of MATLAB compiled code to do value computation
@@ -51,11 +51,11 @@ int main(){
         //Wasteful right now, but not the bottleneck
         //
         //
-        Domain* domain = (Domain*) new GoDomain();
-        MCTS mcts(domain);
+        //Domain* domain = (Domain*) new GoDomain();
+        //MCTS mcts(domain);
+        MCTS mcts;
         MCTS_Node* dummy_node = new MCTS_Node( 2, BOARDSIZE );
-        GoStateStruct* gss = new GoStateStruct;
-        gss->ctor(zh);
+        GoState* gss = new GoState(zh);
         gss->MATLAB2board( game1234 );
         cout << gss->toString() << endl;
         ///set board to example?
@@ -67,11 +67,10 @@ int main(){
         //
         //playout simulation performance timing
     if( true ){
-        GoStateStruct* gss = new GoStateStruct;
-        gss->ctor(zh);
+        GoState* gss = new GoState(zh);
 
-        Domain* domain = (Domain*) new GoDomain();
-        MCTS mcts(domain);
+        //Domain* domain = (Domain*) new GoDomain();
+        MCTS mcts;
 
         int rewards[2];
         clock_t t1,t2;
@@ -82,10 +81,9 @@ int main(){
         //int action = gss->randomAction( to_exclude, true );
         //}
         //cout << "random board with 100 played" << gss->toString() << endl;
-        cout << "num open: " << gss->num_open << endl;
         t1 = clock();
-        mcts.defaultPolicy( rewards, (void *) gss );
-        //launchSimulationKernel( gss, rewards );
+        mcts.defaultPolicy( rewards, gss );
+        //mcts.launchSimulationKernel( gss, rewards );
         t2 = clock();
         cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
 
@@ -93,26 +91,24 @@ int main(){
     
     //play a full MCTS game
     if( false ){
-        Domain* domain = (Domain*) new GoDomain();
-        MCTS mcts(domain);
+        //Domain* domain = (Domain*) new GoDomain();
+        MCTS mcts;
 
-        GoStateStruct* gs = new GoStateStruct;
-        gs->ctor(zh);
-        //void* uncast_state = (void*) gs;
+        GoState* gs = new GoState(zh);
 
         int tid;
         int best_action;
 
         MCTS_Node** search_trees = new MCTS_Node* [N_ROOT_THREADS];
-        GoStateStruct** states = new GoStateStruct* [N_ROOT_THREADS];
+        GoState** states = new GoState* [N_ROOT_THREADS];
 
         int nmoves = 0;
         clock_t total_time_1 = clock();
-        while( nmoves <= MAX_MOVES && !domain->isTerminal( gs ) ){
+        while( nmoves <= MAX_MOVES && !gs->isTerminal() ){
             //initialize each thread's copy of state
             clock_t t1 = clock();
             for( int i=0; i<N_ROOT_THREADS; i++ ){
-                states[i] = gs->copy();
+                states[i] = (GoState*) gs->copy();
             }
  
             //do parallel tree search
@@ -121,7 +117,7 @@ int main(){
                                      private(tid) \
                                      num_threads(N_ROOT_THREADS)
             for( tid=0; tid<N_ROOT_THREADS; tid++){
-                search_trees[tid] = mcts.search( (void*) states[tid] );
+                search_trees[tid] = mcts.search( states[tid] );
             }
 
             //aggregate results
@@ -145,7 +141,7 @@ int main(){
                 }
             }
 
-            int pix = domain->getPlayerIx( gs );
+            int pix = gs->getPlayerIx();
             int best_action = mcts.bestChild( search_trees[0], 
                                               pix, 
                                               true )->action;
@@ -162,7 +158,7 @@ int main(){
             
             //apply to uncast_state
             //assert best_action is legal
-            bool legal = domain->applyAction( gs, best_action, true );
+            bool legal = gs->applyAction( best_action, true );
             cout << "After the " << nmoves << " move, " << endl << gs->toString() << endl;
             assert(legal);
             clock_t t2 = clock();
@@ -173,32 +169,14 @@ int main(){
             nmoves++;
         }
         int rewards[2];
-        domain->getRewards( rewards, (void *) gs );
+        gs->getRewards( rewards );
         cout << "Black Wins: " << rewards[1] << endl;
         cout << "total time taken: " << ((float) (clock()-total_time_1)) / CLOCKS_PER_SEC << endl;
         //do something with the results
     }
    
-    ////Causing double free errors...???
-    value2Terminate();
-    mclTerminateApplication();
-
-    //test basic random and apply functionality on pre-configured boards
-    if( false ){
-        
-        GoStateStruct* gss = new GoStateStruct;
-        gss->ctor(zh);
-        int wi[3] = {1,2,2};
-        int wj[3] = {2,1,2};
-        for( int i=0; i<3; i++ ){
-            gss->setBoard( gss->coord2ix( wi[i], wj[i] ), WHITE );
-        }
-        cout << gss->toString() << endl;
-        BitMask empty;
-        int action = gss->randomAction( &empty, true );
-        cout << gss->toString() << endl;
-    }
-
+    //value2Terminate();
+    //mclTerminateApplication();
 
     return 0;
 

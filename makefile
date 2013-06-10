@@ -1,4 +1,4 @@
-CFLAGS= -O3 -fopenmp #-pg
+CFLAGS= -O3 #-pg -fopenmp
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
@@ -23,7 +23,7 @@ benchmark: kernel.o
 	${CMPLR} -o kernel kernel.o ${CFLAGS}
 
 shared: kernel.o mcts.o go.o
-	${CMPLR} -o kernel kernel.o mcts.o mcts_node.o go.o ${CFLAGS} \
+	${CMPLR} -o kernel queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o ${CFLAGS} \
 	-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
 	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
 

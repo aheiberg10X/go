@@ -22,7 +22,7 @@
 
 //GoStateStruct Constants
 //set these
-#define DIMENSION 19 
+#define DIMENSION 19
 
 //Leave these alone
 #define MAX_EMPTY (DIMENSION*DIMENSION)
