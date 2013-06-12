@@ -1,16 +1,17 @@
-#include "mcts.h"
 #include <assert.h>
 #include <iostream>
 #include <math.h>
+#include <vector>
 
-//for debugging
+#include "mcts.h"
+//break in abstraction for valuePolicy 
 #include "gostate.h"
-//#include "kernel.h"
+#include "weights.h"
 
 //value function
 #include "value_functions/value2.h"
+
 #include "matrix.h"
-#include "weights.h"
 #include <time.h>
 
 using namespace std;
@@ -81,7 +82,7 @@ MCTS_Node* MCTS::treePolicy( MCTS_Node* node,
 
 //value function approach to the treePolicy
 //currently using fred's MATLAB impl
-MCTS_Node* MCTS::valuePolicy( MCTS_Node* node, 
+MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node, 
                               MCTS_State* state ){
     //TODO: do this once for the class at the beginning
     //make them class members
@@ -237,6 +238,59 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
     return node;
 }
 
+//breaking abstraction
+//but get over it
+MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
+                              MCTS_State* state ){
+
+    GoState* gs = (GoState*) state;
+
+    //compute the groups
+    //TODO make these all true, not false.  except for offboards and emtpy
+    BitMask probe_starts;
+    for( int ix=0; ix < BOARDSIZE; ++ix ){
+        char ixcolor = gs->ix2color(ix);
+        if( ixcolor == WHITE || ixcolor == BLACK ){
+            probe_starts.set(ix,true);
+        }
+    }
+
+
+    //the group numbers for every intersection.  -1 for offboards and empties
+    int group_id = 0;
+    int group_assignments[BOARDSIZE];
+    memset( group_assignments, -1, BOARDSIZE );
+
+    //for now, just int size info
+    vector<int> group_info;
+
+    for( int ix=0; ix < BOARDSIZE; ++ix ){
+        if( probe_starts.get(ix) ){
+            char fill_color = gs->ix2color(ix);
+            //don't want any stopping, 'n' will never be seen
+            char stop_color = 'n';
+            bool fill_completed = gs->floodFill( ix, 8, 
+                                                 fill_color, stop_color );
+            assert( fill_completed );
+            //want to remove the flooded intersections from probe_starts
+            //assign them group id in group_info
+            //right now would have to iterate through entire BitMask
+            //to find the marked ones
+            //pass floodFill an optional vector that gets marked nodes
+            //pushed to it?
+            cout << "FF size: " << gs->floodFillSize() << endl ;
+            //do stuff
+        }
+        else{
+            //either an empty, offboard, or already assigned a group
+            //assumes no intersection can be part of only one group
+        }
+    }
+
+
+
+}
+
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
                                MCTS_State*     state ){
     int action;
@@ -345,7 +399,7 @@ void MCTS::defaultPolicy( int* total_rewards,
     int total_results[nplayers];
 
     MCTS_State* scratch_state = state->copy();
-S
+
     //a decent guess at the number of actions taken thus far
     int n_moves_made = state->movesMade();
     for( int i=0; i<NUM_SIMULATIONS; i++ ){

@@ -4,6 +4,7 @@
 #include "constants.h"
 
 struct BitMask {
+    //for quick get/setting of specific board intersections
     bool mask[BOARDSIZE];
     int count;
 

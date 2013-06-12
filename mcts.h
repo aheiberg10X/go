@@ -8,26 +8,27 @@
 
 class MCTS {
 public :
-    int num_players;
-
     MCTS_Node* search( MCTS_State* root_state );
 
-    MCTS_Node* treePolicy( MCTS_Node* node, 
-                           MCTS_State*      state );
+    MCTS_Node* treePolicy( MCTS_Node*  node, 
+                           MCTS_State* state );
 
-    MCTS_Node* randomPolicy( MCTS_Node* node, 
-                             MCTS_State*      state );
+    MCTS_Node* randomPolicy( MCTS_Node*  node, 
+                             MCTS_State* state );
 
-    MCTS_Node* valuePolicy( MCTS_Node* node,
-                              MCTS_State*      state );
-
-    MCTS_Node* uctPolicy( MCTS_Node* node, 
-                          MCTS_State*      state );
+    MCTS_Node* valuePolicy( MCTS_Node*  node,
+                            MCTS_State* state );
+    
+    MCTS_Node* valuePolicyMATLAB( MCTS_Node*  node,
+                                  MCTS_State* state );
+  
+    MCTS_Node* uctPolicy( MCTS_Node*  node, 
+                          MCTS_State* state );
 
     float scoreNode( MCTS_Node* node, 
-                   MCTS_Node* parent, 
-                   int        player_ix, 
-                   bool       just_exploitation );
+                     MCTS_Node* parent, 
+                     int        player_ix, 
+                     bool       just_exploitation );
 
     MCTS_Node* bestChild( MCTS_Node* parent, 
                           int        player_ix,

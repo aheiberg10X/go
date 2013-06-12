@@ -15,6 +15,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -58,6 +59,9 @@ private :
     BitMask marked;
     BitMask connected_to_lib;
     Queue queue;
+    //for group detection, we need floodFillForGroups to track intersections
+    //that get marked.  
+    vector<int> marked_group;
 
     //
     uint16_t empty_intersections[MAX_EMPTY];
@@ -115,10 +119,6 @@ private :
                         char* color_array,
                         int filter_len );
 
-    bool floodFill (int epicenter_ix,
-                    int adjacency,
-                    char flood_color,
-                    char stop_color );
 
     void freezeBoard( char* target );
 
@@ -131,7 +131,9 @@ private :
 
 
 public :
-    //MCTState Interface
+    ///////////////////////////////////////////////////
+    //MCTS_State Interface
+    //
     const int getNumPlayers();
 
     int getNumActions();
@@ -162,8 +164,9 @@ public :
     string toString( );
 
     /////////////////////////////////////////////////////////
+    //Helpers
+    //
 
-    //TODO fix up all ctor uses
     GoState( ZobristHash* zh);
 
     string boardToString( char* board );
@@ -178,6 +181,18 @@ public :
     
     int ix2color( int ix );
 
+    bool floodFill (int epicenter_ix,
+                    int adjacency,
+                    char flood_color,
+                    char stop_color );
+    
+    vector<int> floodFillForGroups( int epicenter_ix,
+                                    char flood_color );
+
+
+    //need accessor to FF's "marked" BitMask
+    int floodFillSize();
+    
     //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/
 

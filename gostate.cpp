@@ -473,7 +473,6 @@ bool GoState::floodFill(
             continue;
         }
         else {
-            //N
             int nix;
             if( board[ix-BIGDIM] == stop_color ||
                 board[ix+BIGDIM] == stop_color || 
@@ -483,6 +482,7 @@ bool GoState::floodFill(
                 break;
             }
 
+            //N
             nix = ix-BIGDIM;
             if( board[nix] == flood_color  ){ 
                 if( !marked.get( nix) ){
@@ -518,6 +518,63 @@ bool GoState::floodFill(
     }
 
     return stop_color_not_encountered;
+}
+
+vector<int> GoState::floodFillForGroups(  
+                int epicenter_ix,
+                char flood_color ){
+
+    queue.clear(); 
+    marked_group.clear();
+
+    //cout << "epicenter: " << epicenter_ix << endl;
+    queue.push( epicenter_ix );
+    marked_group.push_back( epicenter_ix );
+    
+    while( !queue.isEmpty() ){
+        int ix = queue.pop();
+ 
+        int nix;
+
+        //N
+        nix = ix-BIGDIM;
+        if( board[nix] == flood_color  ){ 
+            if( !marked.get( nix) ){
+                queue.push(nix);
+                marked_group.push_back(nix);
+            }
+        }
+        //S
+        nix = ix+BIGDIM;
+        if( board[nix] == flood_color ){
+            if( !marked.get( nix) ){
+                queue.push(nix);
+                marked_group.push_back(nix);
+            }
+        }
+        //E
+        nix = ix+1;
+        if( board[nix] == flood_color ){
+            if( !marked.get( nix) ){
+                queue.push(nix);
+                marked_group.push_back(nix);
+            }
+        }
+        //W
+        nix = ix-1;
+        if( board[nix] == flood_color ){  //W
+            if( !marked.get( nix) ){
+                queue.push(nix);
+                marked_group.push_back(nix);
+            }
+        }
+    }
+
+    return marked_group;
+}
+
+int GoState::floodFillSize(){
+    return marked.count;
 }
 
 //TODO much faster if we have access to a hash_map O(n) -> O(1)

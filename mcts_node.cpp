@@ -6,7 +6,7 @@ using namespace std;
 
 //for initializing the root node
 MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
-    incCreated();
+    //incCreated();
     num_players = anum_players;
     num_actions = anum_actions;
     tried_actions = new BitMask; 
@@ -23,7 +23,7 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
 
 //for initializing non-root nodes
 MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
-    incCreated();
+    //incCreated();
     is_root = false;
     marked = false;
     parent = aparent;
@@ -49,6 +49,7 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     value = 0;
 }
 
+/*
 int MCTS_Node::num_nodes_created = 0;
 int MCTS_Node::num_nodes_destroyed = 0;
 
@@ -59,23 +60,16 @@ void MCTS_Node::incCreated(){
 void MCTS_Node::incDestroyed(){
     num_nodes_destroyed++;
 }
+*/
     
 MCTS_Node::~MCTS_Node(){
-    incDestroyed();
-    //cout << "NODE DELETED" << endl;
+    //incDestroyed();
     delete[] total_rewards;
-    //cout << "wat" << endl;
     for( int i=0; i<num_actions; i++ ){
         if( tried_actions->get(i) ){
-            //cout << "going" << endl;
             delete children[i];
-            //cout << "on" << endl;
         }    
-        //else{
-        //delete children[i];
-        //}
     }
     delete[] children;
     delete tried_actions;
-    //delete children;
 }
