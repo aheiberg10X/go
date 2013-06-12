@@ -152,8 +152,8 @@ int main(){
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
-    testValuePolicy();
-    //testDefaultPolicy();
+    //testValuePolicy();
+    testDefaultPolicy();
     //playGame();
    
     //value2Terminate();

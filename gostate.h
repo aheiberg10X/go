@@ -100,7 +100,7 @@ private :
 
     bool isKnownIllegal( int ix );
     
-    void capture( BitMask* bm );
+    void capture();
 
     bool isBorder( int ix );
 
@@ -186,10 +186,6 @@ public :
                     char flood_color,
                     char stop_color );
     
-    vector<int> floodFillForGroups( int epicenter_ix,
-                                    char flood_color );
-
-
     //need accessor to FF's "marked" BitMask
     int floodFillSize();
     

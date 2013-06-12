@@ -316,18 +316,25 @@ void GoState::setBoard( int* ixs, int len, char color ){
     }
 }    
 
-//if space is no object, why not just have an array with marked values
-//this way don't need to iterate all the way though the 0's
-void GoState::capture( BitMask* bm ){
-    int nSet = 0;
-    int ix = 0;
-    while( nSet < bm->count ){
-        if( bm->get(ix) ){ 
-            setBoard( ix, EMPTY );
-            nSet++;
-        }
-        ix++;
+void GoState::capture(){
+    for( vector<int>::iterator it = marked_group.begin();
+            it != marked_group.end();
+            ++it ){
+        int ix = *it;
+        setBoard( ix, EMPTY );
     }
+
+    ////was the way to capture using the bitmask, 
+    ////before the marked_group vector was introduced
+    //int nSet = 0;
+    //int ix = 0;
+    //while( nSet < bm->count ){
+    //if( bm->get(ix) ){ 
+    //setBoard( ix, EMPTY );
+    //nSet++;
+    //}
+    //ix++;
+    //}
 }
 
 bool GoState::isBorder( int ix ){
@@ -458,10 +465,12 @@ bool GoState::floodFill(
 
     queue.clear(); 
     marked.clear();
+    marked_group.clear();
 
     //cout << "epicenter: " << epicenter_ix << endl;
     queue.push( epicenter_ix );
     marked.set( epicenter_ix, true );
+    marked_group.push_back( epicenter_ix );
     
     bool stop_color_not_encountered = true;
     while( !queue.isEmpty() ){
@@ -488,6 +497,7 @@ bool GoState::floodFill(
                 if( !marked.get( nix) ){
                     queue.push(nix);
                     marked.set( nix,true);
+                    marked_group.push_back(nix);
                 }
             }
             //S
@@ -496,6 +506,7 @@ bool GoState::floodFill(
                 if( !marked.get( nix) ){
                     queue.push(nix);
                     marked.set( nix,true);
+                    marked_group.push_back(nix);
                 }
             }
             //E
@@ -504,6 +515,7 @@ bool GoState::floodFill(
                 if( !marked.get( nix) ){
                     queue.push(nix);
                     marked.set( nix,true);
+                    marked_group.push_back(nix);
                 }
             }
             //W
@@ -512,65 +524,13 @@ bool GoState::floodFill(
                 if( !marked.get( nix) ){
                     queue.push(nix);
                     marked.set( nix,true);
+                    marked_group.push_back(nix);
                 }
             }
         }
     }
 
     return stop_color_not_encountered;
-}
-
-vector<int> GoState::floodFillForGroups(  
-                int epicenter_ix,
-                char flood_color ){
-
-    queue.clear(); 
-    marked_group.clear();
-
-    //cout << "epicenter: " << epicenter_ix << endl;
-    queue.push( epicenter_ix );
-    marked_group.push_back( epicenter_ix );
-    
-    while( !queue.isEmpty() ){
-        int ix = queue.pop();
- 
-        int nix;
-
-        //N
-        nix = ix-BIGDIM;
-        if( board[nix] == flood_color  ){ 
-            if( !marked.get( nix) ){
-                queue.push(nix);
-                marked_group.push_back(nix);
-            }
-        }
-        //S
-        nix = ix+BIGDIM;
-        if( board[nix] == flood_color ){
-            if( !marked.get( nix) ){
-                queue.push(nix);
-                marked_group.push_back(nix);
-            }
-        }
-        //E
-        nix = ix+1;
-        if( board[nix] == flood_color ){
-            if( !marked.get( nix) ){
-                queue.push(nix);
-                marked_group.push_back(nix);
-            }
-        }
-        //W
-        nix = ix-1;
-        if( board[nix] == flood_color ){  //W
-            if( !marked.get( nix) ){
-                queue.push(nix);
-                marked_group.push_back(nix);
-            }
-        }
-    }
-
-    return marked_group;
 }
 
 int GoState::floodFillSize(){
@@ -729,7 +689,7 @@ bool GoState::applyAction( int action,
                                                   EMPTY );
                 if( fill_completed ){
                     //connected_to_lib.clear();
-                    capture( &marked );
+                    capture();
                     capture_made = true;
                     //black_known_illegal.clear();
                     //white_known_illegal.clear();
