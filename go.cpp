@@ -30,13 +30,19 @@ void testValuePolicy(){
     MCTS mcts;
     MCTS_Node* dummy_node = new MCTS_Node( 2, BOARDSIZE );
     MCTS_State* gss = new GoState(zh);
-    gss->applyAction(BIGDIM+1,true);
-    gss->applyAction(BIGDIM+3,true);
-    gss->applyAction(BIGDIM+2,true);
-    gss->applyAction(BIGDIM+4,true);
-    cout << gss->toString() << endl;
+    ((GoState*) gss)->MATLAB2board( game1234 );
+    //gss->applyAction(BIGDIM+1,true);
+    //gss->applyAction(BIGDIM+3,true);
+    //gss->applyAction(BIGDIM+2,true);
+    //gss->applyAction(BIGDIM+4,true);
+    //gss->applyAction(2*BIGDIM+3,true);
+    //gss->applyAction(BIGDIM+5,true);
+    //gss->applyAction(2*BIGDIM+4,true);
+    //cout << gss->toString() << endl;
 
-    mcts.valuePolicy( dummy_node, gss );
+    //mcts.valuePolicy( dummy_node, gss );
+    string dummy[BOARDSIZE];
+    cout << GoState::prettyBoard( dummy, 4 );
 };
 
 void testDefaultPolicy(){
@@ -152,8 +158,8 @@ int main(){
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
-    //testValuePolicy();
-    testDefaultPolicy();
+    testValuePolicy();
+    //testDefaultPolicy();
     //playGame();
    
     //value2Terminate();

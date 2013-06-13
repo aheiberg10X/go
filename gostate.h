@@ -163,6 +163,8 @@ public :
     
     string toString( );
 
+    static string prettyBoard( string* board, int gap );
+
     /////////////////////////////////////////////////////////
     //Helpers
     //
@@ -189,6 +191,11 @@ public :
     //need accessor to FF's "marked" BitMask
     int floodFillSize();
     
+    vector<int> getMarkedGroup();
+
+    //for mcts.valuePolicy
+    void setBinaryFeatures(int* features, int nfeatures);
+
     //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/
 

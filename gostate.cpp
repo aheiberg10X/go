@@ -209,6 +209,39 @@ string GoState::boardToString( char* board ){
     return out.str();
 }
 
+string GoState::prettyBoard( string* board, int gap ){
+    stringstream out;
+    out << "   ";
+    for( int i=0; i<BIGDIM; i++){
+        out << i+1;
+        if( i+1 >= 10 ){
+           out << " ";
+        }
+        else{
+            out << "  ";
+        }
+    }
+    out << "\n 0 ";
+    //out += ss.str();
+    for( int i=0; i<BOARDSIZE; i++ ){
+        out << board[i]; 
+        out << "  ";
+        if( i % BIGDIM == BIGDIM-1 ){
+            out << "\n";
+            int row = i/BIGDIM+1;
+            if( row >= 10 ){
+                out << "";
+            }
+            else{
+                out << " ";
+            }
+            out << row << " ";
+        }
+    }
+    return out.str();
+
+}
+
 string GoState::toString(){
     string out;
     stringstream ss;
@@ -482,7 +515,6 @@ bool GoState::floodFill(
             continue;
         }
         else {
-            int nix;
             if( board[ix-BIGDIM] == stop_color ||
                 board[ix+BIGDIM] == stop_color || 
                 board[ix+1] == stop_color ||
@@ -491,6 +523,38 @@ bool GoState::floodFill(
                 break;
             }
 
+            int nixs[8];
+            if( adjacency == 4 ){
+                nixs[0] = ix-BIGDIM;
+                nixs[1] = ix+BIGDIM;
+                nixs[2] = ix-1;
+                nixs[3] = ix+1;
+            }
+            else if( adjacency == 8 ){
+                nixs[0] = ix-BIGDIM;
+                nixs[1] = ix+BIGDIM;
+                nixs[2] = ix-1;
+                nixs[3] = ix+1;
+                nixs[4] = ix-BIGDIM-1;
+                nixs[5] = ix-BIGDIM+1;
+                nixs[6] = ix+BIGDIM+1;
+                nixs[7] = ix+BIGDIM-1;
+            }
+            else assert(false);
+
+            for( int a=0; a<adjacency; ++a ){
+                int nix = nixs[a];
+                if( board[nix] == flood_color  ){ 
+                    if( !marked.get( nix) ){
+                        queue.push(nix);
+                        marked.set( nix,true);
+                        marked_group.push_back(nix);
+                    }
+                }
+            }
+            
+            /*
+            int nix;
             //N
             nix = ix-BIGDIM;
             if( board[nix] == flood_color  ){ 
@@ -527,6 +591,7 @@ bool GoState::floodFill(
                     marked_group.push_back(nix);
                 }
             }
+            */
         }
     }
 
@@ -535,6 +600,10 @@ bool GoState::floodFill(
 
 int GoState::floodFillSize(){
     return marked.count;
+}
+
+vector<int> GoState::getMarkedGroup(){
+    return marked_group;
 }
 
 //TODO much faster if we have access to a hash_map O(n) -> O(1)
@@ -1008,5 +1077,182 @@ void GoState::getRewards( int* to_fill ){
     return;
 }
 */
+
+int featureIX( int feature, int ix ){
+    return MAX_EMPTY*feature + ix;
+}
+
+void GoState::setBinaryFeatures( int* features, int nfeatures ){
+
+    //the group numbers for every intersection.  -1 for offboards and empties
+    int group_id = 0;
+    int group_assignments[BOARDSIZE];
+    memset( group_assignments, -1, sizeof(int)*BOARDSIZE );
+
+    //for now, just int size info
+    vector<int> group_info;
+
+    //don't need to FF intersections that have already been assigned a group
+    BitMask in_group;
+
+    //find the groups
+    for( int ix=0; ix < BOARDSIZE; ++ix ){
+        char ixcolor = ix2color(ix);
+
+        if( (ixcolor == WHITE || ixcolor == BLACK) &&
+             in_group.get(ix) == false ){
+
+            char fill_color = ixcolor;
+            //don't want any stopping, 'n' will never be seen
+            char stop_color = 'n';
+            bool fill_completed = floodFill( ix, 8, 
+                                                 fill_color, stop_color );
+            assert( fill_completed );
+
+            vector<int> marked_group = getMarkedGroup();
+            vector<int>::iterator it;
+            for( it = marked_group.begin();
+                 it != marked_group.end();
+                 ++it ){
+                int claimed_ix = *it;
+                in_group.set(claimed_ix,true);
+                group_assignments[claimed_ix] = group_id;
+            }
+            group_info.push_back( floodFillSize() );
+            cout << "group " << group_id << " size: " << floodFillSize() << endl ;
+            ++group_id;
+        }
+        else{
+            //either an empty, offboard, or already assigned a group
+            //assumes intersection can be part of only one group
+            continue;
+        }
+    }
+    
+    //debug printing
+    for( int j=0; j<BOARDSIZE; j++ ){
+        if( j % BIGDIM == 0 ){
+            cout << endl;
+        }
+        cout << group_assignments[j] << ", ";
+    }
+
+
+
+    // features' vector (binary, 1x20)
+    // 1 = off-limit goban
+    // 2 = empty intersection 
+    // 3 = isolated Black stone
+    // 4 = isolated White stone
+    // 5 = all Black stones
+    // 6-12 = # liberties for a Black group 1, 2, 3, 4, 5-6, 7-9, 10 or more
+    // 13 = all White stones 
+    // 14-20 = # liberties for a White group 1, 2, 3, 4, 5-6, 7-9, 10 or more
+    //
+    // there're also 11 additional features based on the difference of the
+    // Manhattan distance between friendly stones and the ones of the opponent
+    // 21 = 0 (new stone at equal distance from friendly and opponent's stones)
+    // 22 = -1
+    // 23 = -2 or -3
+    // 24 = -4 or -5
+    // 25= -6 to -8
+    // 26 = < -8
+    // 27 = 1
+    // 28 = 2 or 3
+    // 29 = 4 or 5
+    // 30 6 to 8
+    // 31 = >8
+    // EXCEPT -1 FROM EVERY INDEX BECAUSE THIS ISN"T MATLAB
+    
+    //ix of intersection with no buffer/apron around board
+    //keep track of this as iterate through apron'ed board, below
+    int nbix = 0;
+
+    for(int ix=0; ix<BOARDSIZE; ++ix){
+        char color = ix2color(ix);
+        int group_id = group_assignments[ix];
+        int group_size = group_info[group_id];
+
+        if( color == OFFBOARD ){
+            continue;
+        }
+        if( color == EMPTY ){
+            //1 is the empty/not feature board
+            features[ featureIX(1,nbix) ] = 1;
+
+            //examine group id's of 4 neighbors
+            const int adj = 4;
+            int nixs[adj] = {ix-BIGDIM,ix+BIGDIM,ix-1,ix+1};
+            for( int a=0; a<adj; ++a ){
+                int nix = nixs[a];
+                char ncolor = ix2color(nix);
+                int ngroup_id = group_assignments[nix];
+                int ngroup_size = group_info[ngroup_id];
+                if( ncolor == OFFBOARD || ncolor == EMPTY ){
+                    continue;
+                }
+
+                //offset the feature index depending on the neighbor group
+                //color
+                int color_feature_offset;
+                if( ncolor == BLACK ){
+                    color_feature_offset = 0; 
+                }
+                else if( ncolor == WHITE ){
+                    color_feature_offset = 8;
+                }
+                else assert(false);
+
+                //if black:
+                //feature boards 5-8 : sizes 1-4
+                //               9   : sizes 5-6
+                //              10   : sizes 7-9
+                //              11   : sizes > 10
+                //if white: each feature index+8
+                int feature = color_feature_offset;
+                if( 1 <= ngroup_size && ngroup_size <= 4 ){
+                    feature +=  ngroup_size + 4;
+                    features[ featureIX(feature,nbix) ] = 1;
+                }
+                else if( ngroup_size == 5 || ngroup_size == 6 ){
+                    feature += 9;
+                    features[ featureIX(feature,nbix) ] = 1;
+                }
+                else if( 7 <= ngroup_size && ngroup_size <= 9 ){
+                    feature += 10;
+                    features[ featureIX(feature,nbix) ] = 1;
+                }
+                else{
+                    feature += 11;
+                    features[ featureIX(feature,nbix) ] = 1;
+                }
+            }
+        }
+        else {
+            if( color == BLACK ){
+                if( group_size == 1 ){
+                    //2 : isolated
+                    features[ featureIX(2,nbix) ] = 1;
+                }
+                //4 : all black
+                features[ featureIX(4,nbix) ] = 1;
+            }
+            else if( color == WHITE ){
+                if( group_size == 1 ){
+                    //3 : isolated
+                    features[ featureIX(3,nbix) ] = 1;
+                }
+                //12 : all white
+                features[ featureIX(12,nbix) ] = 1;
+            }
+            else assert(false);
+
+            //manhattan distance
+            //do standard spiral algo first
+            //will qtree's help? yes, but lengthy (fun) impl time
+        }
+        ++nbix;
+    }
+}
 
 
