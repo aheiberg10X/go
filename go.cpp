@@ -151,6 +151,82 @@ void playGame(/*params for treePolicy configuration*/){
     //do something with the results
 };
 
+
+//based on 5x5 board
+void testManhattanDist(){
+    ZobristHash* zh = new ZobristHash;
+    zh->ctor();
+    MCTS mcts;
+    MCTS_Node* dummy_node = new MCTS_Node( 2, BOARDSIZE );
+    GoState* gss;
+    pair<int,int> dists;
+
+    //1
+    gss = new GoState(zh);
+    gss->applyAction(3*BIGDIM+3,true);
+    gss->applyAction(BIGDIM+5,true);
+    gss->applyAction(3*BIGDIM+2,true);
+    cout << gss->toString() << endl;
+    dists = gss->getManhattanDistPair( 3*BIGDIM+3 );
+    assert( dists.first == 1 && dists.second == 4 );
+    delete gss;
+
+    //2
+    gss = new GoState(zh);
+    gss->applyAction(BIGDIM+1,true);
+    gss->applyAction(BIGDIM+5,true);
+    gss->applyAction(5*BIGDIM+5,true);
+    cout << gss->toString() << endl;
+    dists = gss->getManhattanDistPair( 5*BIGDIM+5 );
+    assert( dists.first == 8 && dists.second == 4 );
+    delete gss;
+
+
+}
+
+void testSetBinaryFeatures(){
+    const int nfeatures = 31;
+    int features[ nfeatures * MAX_EMPTY ] = {0};
+
+    ZobristHash* zh = new ZobristHash;
+    zh->ctor();
+    GoState gss(zh);
+
+    gss.applyAction(3*BIGDIM+3,true);
+    gss.applyAction(3*BIGDIM+2,true);
+    gss.applyAction(2*BIGDIM+3,true);
+    gss.setBinaryFeatures( features, nfeatures );
+
+    cout << "done setting" << endl;
+
+    string feature_str = gss.featuresToString( features, nfeatures );
+    cout << feature_str << endl;
+
+}
+
+void timeSetBinaryFeatures(){
+    clock_t t1 = clock();
+    
+    ZobristHash* zh = new ZobristHash;
+    zh->ctor();
+    GoState* gss = new GoState(zh);
+    gss->MATLAB2board( game1234 );
+    cout << gss->toString() << endl;
+
+    const int nfeatures = 31;
+    int features[ nfeatures * MAX_EMPTY ] = {0};
+
+    for( int i=0; i<10000; ++i ){
+        gss->setBinaryFeatures( features, nfeatures ); 
+        //if( i == 0 ){
+        //cout << gss->featuresToString( features, nfeatures ) << endl;
+        //}
+    }
+
+    clock_t t2 = clock();
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+}
+
 int main(){
     srand(time(0));
     cout << sizeof(GoState) << endl;
@@ -158,9 +234,12 @@ int main(){
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
-    testValuePolicy();
+    //testValuePolicy();
     //testDefaultPolicy();
     //playGame();
+    //testManhattanDist();
+    //testSetBinaryFeatures();
+    timeSetBinaryFeatures();
    
     //value2Terminate();
     //mclTerminateApplication();

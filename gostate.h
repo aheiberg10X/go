@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 using namespace std;
 
@@ -162,6 +163,7 @@ public :
     void getRewards( int* to_fill );
     
     string toString( );
+    string featuresToString(int* features, int nfeatures);
 
     static string prettyBoard( string* board, int gap );
 
@@ -195,6 +197,9 @@ public :
 
     //for mcts.valuePolicy
     void setBinaryFeatures(int* features, int nfeatures);
+
+    //return man dist to <friend,foe>
+    pair<int,int> getManhattanDistPair( int ix );
 
     //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/

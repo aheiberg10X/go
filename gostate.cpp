@@ -242,6 +242,57 @@ string GoState::prettyBoard( string* board, int gap ){
 
 }
 
+string GoState::featuresToString( int* features, int nfeatures ){
+    string out;
+    stringstream ss;
+
+    string descriptors[31] = {"off-limit",
+                              "empty",
+                              "isolated black",
+                              "isolated white",
+                              "all black",
+                              "liberty for size 1 black group",
+                              "liberty for size 2 black group",
+                              "liberty for size 3 black group",
+                              "liberty for size 4 black group",
+                              "liberty for size 5-6 black group",
+                              "liberty for size 7-9 black group",
+                              "liberty for size 10 black group",
+                              "all white",
+                              "liberty for size 1 white group",
+                              "liberty for size 2 white group",
+                              "liberty for size 3 white group",
+                              "liberty for size 4 white group",
+                              "liberty for size 5-6 white group",
+                              "liberty for size 7-9 white group",
+                              "liberty for size 10 white group",
+                              "abs(friend_dist-foe_dist) == 0", 
+                              "abs(friend_dist-foe_dist) == -1", 
+                              "abs(friend_dist-foe_dist) == -2,-3", 
+                              "abs(friend_dist-foe_dist) == -4,-5", 
+                              "abs(friend_dist-foe_dist) == -6,-7,-8", 
+                              "abs(friend_dist-foe_dist) == -9...", 
+                              "abs(friend_dist-foe_dist) == 1", 
+                              "abs(friend_dist-foe_dist) == 2,3", 
+                              "abs(friend_dist-foe_dist) == 4,5", 
+                              "abs(friend_dist-foe_dist) == 6,7,8", 
+                              "abs(friend_dist-foe_dist) == 9..."
+                             };
+    for( int f=0; f<nfeatures; ++f ){
+        ss << "Feature " << f << " ( " << descriptors[f] << " )" << endl;
+        for( int ix=0; ix < MAX_EMPTY; ++ix ){
+            if( ix % DIMENSION == 0 ){
+                ss << endl;
+            }
+            int fix = MAX_EMPTY*f + ix;
+            ss << features[fix] << " ";
+        }
+        ss << endl << "============================" << endl;
+    }
+    return ss.str();
+}
+
+
 string GoState::toString(){
     string out;
     stringstream ss;
@@ -370,7 +421,7 @@ void GoState::capture(){
     //}
 }
 
-bool GoState::isBorder( int ix ){
+inline bool GoState::isBorder( int ix ){
     if( ix <= BIGDIM-1 ){ return true; }
     else if( ix % BIGDIM == 0 ){return true; }
     else if( ix % BIGDIM == BIGDIM-1 ){ return true; }
@@ -1078,8 +1129,15 @@ void GoState::getRewards( int* to_fill ){
 }
 */
 
+//take the feature board, and the ix and compute
+//the offset in the feature array
+//PERF TODO: if we compute nbix once ahead of time, will save a bit
 int featureIX( int feature, int ix ){
-    return MAX_EMPTY*feature + ix;
+    int nbix = GoState::bufferix2nobufferix( ix ); 
+    if( nbix == -1 ) assert(false);
+    else {
+        return MAX_EMPTY*feature + nbix;
+    }
 }
 
 void GoState::setBinaryFeatures( int* features, int nfeatures ){
@@ -1095,7 +1153,7 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
     //don't need to FF intersections that have already been assigned a group
     BitMask in_group;
 
-    //find the groups
+    //cout << "find the and build metadata about the groups" << endl;
     for( int ix=0; ix < BOARDSIZE; ++ix ){
         char ixcolor = ix2color(ix);
 
@@ -1106,7 +1164,7 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
             //don't want any stopping, 'n' will never be seen
             char stop_color = 'n';
             bool fill_completed = floodFill( ix, 8, 
-                                                 fill_color, stop_color );
+                                             fill_color, stop_color );
             assert( fill_completed );
 
             vector<int> marked_group = getMarkedGroup();
@@ -1119,7 +1177,7 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
                 group_assignments[claimed_ix] = group_id;
             }
             group_info.push_back( floodFillSize() );
-            cout << "group " << group_id << " size: " << floodFillSize() << endl ;
+            //cout << "group " << group_id << " size: " << floodFillSize() << endl ;
             ++group_id;
         }
         else{
@@ -1129,15 +1187,14 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
         }
     }
     
-    //debug printing
-    for( int j=0; j<BOARDSIZE; j++ ){
-        if( j % BIGDIM == 0 ){
-            cout << endl;
-        }
-        cout << group_assignments[j] << ", ";
-    }
-
-
+    //cout << "groups assignments" << endl;
+    //for( int j=0; j<BOARDSIZE; j++ ){
+    //if( j % BIGDIM == 0 ){
+    //cout << endl;
+    //}
+    //cout << group_assignments[j] << ", ";
+    //}
+    //cout << endl;
 
     // features' vector (binary, 1x20)
     // 1 = off-limit goban
@@ -1148,49 +1205,34 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
     // 6-12 = # liberties for a Black group 1, 2, 3, 4, 5-6, 7-9, 10 or more
     // 13 = all White stones 
     // 14-20 = # liberties for a White group 1, 2, 3, 4, 5-6, 7-9, 10 or more
-    //
-    // there're also 11 additional features based on the difference of the
-    // Manhattan distance between friendly stones and the ones of the opponent
-    // 21 = 0 (new stone at equal distance from friendly and opponent's stones)
-    // 22 = -1
-    // 23 = -2 or -3
-    // 24 = -4 or -5
-    // 25= -6 to -8
-    // 26 = < -8
-    // 27 = 1
-    // 28 = 2 or 3
-    // 29 = 4 or 5
-    // 30 6 to 8
-    // 31 = >8
-    // EXCEPT -1 FROM EVERY INDEX BECAUSE THIS ISN"T MATLAB
-    
-    //ix of intersection with no buffer/apron around board
-    //keep track of this as iterate through apron'ed board, below
-    int nbix = 0;
-
+        
     for(int ix=0; ix<BOARDSIZE; ++ix){
+        
         char color = ix2color(ix);
-        int group_id = group_assignments[ix];
-        int group_size = group_info[group_id];
+
+        //the ix into the feature array
+        int fix;        
 
         if( color == OFFBOARD ){
             continue;
         }
         if( color == EMPTY ){
             //1 is the empty/not feature board
-            features[ featureIX(1,nbix) ] = 1;
+            fix = featureIX(1,ix);
+            features[ fix ] = 1;
 
-            //examine group id's of 4 neighbors
+            //examine group id's of 4 neighbors to see if this empty
+            //position is a liberty of a group
             const int adj = 4;
             int nixs[adj] = {ix-BIGDIM,ix+BIGDIM,ix-1,ix+1};
             for( int a=0; a<adj; ++a ){
                 int nix = nixs[a];
                 char ncolor = ix2color(nix);
-                int ngroup_id = group_assignments[nix];
-                int ngroup_size = group_info[ngroup_id];
                 if( ncolor == OFFBOARD || ncolor == EMPTY ){
                     continue;
                 }
+                int ngroup_id = group_assignments[nix];
+                int ngroup_size = group_info[ngroup_id];
 
                 //offset the feature index depending on the neighbor group
                 //color
@@ -1212,47 +1254,164 @@ void GoState::setBinaryFeatures( int* features, int nfeatures ){
                 int feature = color_feature_offset;
                 if( 1 <= ngroup_size && ngroup_size <= 4 ){
                     feature +=  ngroup_size + 4;
-                    features[ featureIX(feature,nbix) ] = 1;
+                    features[ featureIX(feature,ix) ] = 1;
                 }
                 else if( ngroup_size == 5 || ngroup_size == 6 ){
                     feature += 9;
-                    features[ featureIX(feature,nbix) ] = 1;
+                    features[ featureIX(feature,ix) ] = 1;
                 }
                 else if( 7 <= ngroup_size && ngroup_size <= 9 ){
                     feature += 10;
-                    features[ featureIX(feature,nbix) ] = 1;
+                    features[ featureIX(feature,ix) ] = 1;
                 }
                 else{
                     feature += 11;
-                    features[ featureIX(feature,nbix) ] = 1;
+                    features[ featureIX(feature,ix) ] = 1;
                 }
             }
         }
-        else {
+        else { //color isn't EMPTY or OFFBOARD
+            int group_id = group_assignments[ix];
+            int group_size = group_info[group_id];
+
             if( color == BLACK ){
                 if( group_size == 1 ){
                     //2 : isolated
-                    features[ featureIX(2,nbix) ] = 1;
+                    features[ featureIX(2,ix) ] = 1;
                 }
                 //4 : all black
-                features[ featureIX(4,nbix) ] = 1;
+                features[ featureIX(4,ix) ] = 1;
             }
             else if( color == WHITE ){
                 if( group_size == 1 ){
                     //3 : isolated
-                    features[ featureIX(3,nbix) ] = 1;
+                    features[ featureIX(3,ix) ] = 1;
                 }
                 //12 : all white
-                features[ featureIX(12,nbix) ] = 1;
+                features[ featureIX(12,ix) ] = 1;
             }
             else assert(false);
+
+            // there're also 11 additional features based on difference of
+            // Manhattan distance between friendly and opponent stones
+            // 21 = 0 (new stone equal distance from friendly and opponent)
+            // 22 = -1
+            // 23 = -2 or -3
+            // 24 = -4 or -5
+            // 25= -6 to -8
+            // 26 = < -8
+            // 27 = 1
+            // 28 = 2 or 3
+            // 29 = 4 or 5
+            // 30 6 to 8
+            // 31 = >8
+            // EXCEPT -1 FROM EVERY INDEX BECAUSE THIS ISN"T MATLAB
 
             //manhattan distance
             //do standard spiral algo first
             //will qtree's help? yes, but lengthy (fun) impl time
+            pair<int,int> dists = getManhattanDistPair(ix);
+            int friend_dist = dists.first;
+            int foe_dist = dists.second;
+            int diff = friend_dist - foe_dist;
+            if( diff == 0 )       
+                features[ featureIX(20,ix) ] = 1;
+            else if( diff == -1 ) 
+                features[ featureIX(21,ix) ] = 1;
+            else if( diff == -2 || diff == -3 ) 
+                features[ featureIX(22,ix) ] = 1;
+            else if( diff == -4 || diff == -5 ) 
+                features[ featureIX(23,ix) ] = 1;
+            else if( -8 <= diff && diff <= -6 ) 
+                features[ featureIX(24,ix) ] = 1;
+            else if( diff <= -8 ) 
+                features[ featureIX(25,ix) ] = 1;
+            else if( diff == 1 ) 
+                features[ featureIX(26,ix) ] = 1;
+            else if( diff == 2 || diff == 3 ) 
+                features[ featureIX(27,ix) ] = 1;
+            else if( diff == 4 || diff == 5 ) 
+                features[ featureIX(28,ix) ] = 1;
+            else if( 6 <= diff && diff <= 8 ) 
+                features[ featureIX(29,ix) ] = 1;
+            else if( diff >= 8 ) 
+                features[ featureIX(30,ix) ] = 1;
+
         }
-        ++nbix;
     }
 }
 
 
+//  4 3 2 3 4
+//  3 2 1 2 3
+//  2 1 0 1 2
+//  3 2 1 2 3
+//  4 3 2 3 4
+pair<int,int> GoState::getManhattanDistPair( int ix ){
+    char frend_color = ix2color(ix);
+    assert( frend_color != EMPTY && frend_color != OFFBOARD );
+    char foe_color = flipColor( frend_color );
+
+    int frend_dist = 0;
+    int foe_dist = 0;
+    bool frend_found = false;
+    bool foe_found = false;
+
+    //spiral around neighbors at manhat dist 1,2,3,etc until
+    int radius = 1;
+    //start at the NW neighbor
+    int spiral_head = ix-BIGDIM-1;
+    while( !(frend_found && foe_found) && radius < DIMENSION ){
+        
+        //we start at the corners, so need to take radius*2 steps
+        //to reach the other corner
+        int nsteps = radius*2;
+
+        //after radius steps inwards
+        //we are directly above/below,left/right of the starting ix
+        //and therefore min distance
+        int min_dist_step = radius;
+
+        for( int dir=0; dir < 4; ++dir ){
+
+            for( int step=0; step < nsteps; ++step ){
+                
+                //check if friend or foe
+                char spiral_color = ix2color(spiral_head);
+                if( spiral_color == frend_color ){
+                    frend_dist = radius + abs(step - min_dist_step);
+                    //cout << "frend_dist: " << frend_dist << endl;
+                    frend_found = true;
+                    if( foe_found ) break;
+
+                }
+                else if( spiral_color == foe_color ){
+                    foe_dist = radius + abs(step - min_dist_step);
+                    //cout << "foe_dist: " << foe_dist << endl;
+                    foe_found = true;
+                    if( frend_found ) break;
+                }
+                else{
+                    //nothing
+                }
+
+                //update the spiral_head
+                if( dir == 0 )       ++spiral_head;
+                else if( dir == 1 )  spiral_head += BIGDIM;
+                else if( dir == 2 )  --spiral_head;
+                else                 spiral_head -= BIGDIM;
+                
+            }
+            if( frend_found && foe_found ) break;
+        }
+
+        //now spiral_head is back where it started, top-left corner of
+        //the given radius box
+        //so inc the radius and move spiral_head up and left one
+        ++radius;
+        spiral_head -= (BIGDIM+1);
+    }
+
+    return pair<int,int> (frend_dist,foe_dist);
+
+}
