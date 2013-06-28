@@ -148,6 +148,351 @@ void GoState::board2MATLAB( double* matlab_board ){
     }
 }
 
+
+//helper for gaussian kernling
+void GoState::board2csv( float* board, int size, int width, string filename ){
+    ofstream myfile;
+    myfile.open ( filename.c_str() );
+    for (int i=0; i<size; i++)
+    {
+        if( i % width == 0 and i != 0 ){
+            myfile << endl;
+        }
+        myfile << board[i] << ",";
+    }
+    myfile.close();
+}
+
+bool GoState::inVerticalEdge( int* input_board, int ix ){
+    int side = getSide(ix);
+    if( side == 1 || side == 4 ){ 
+        //if stone on top or bottom, can't have its top and bottom 
+        //neighbs both be one
+        return false; }
+
+    int north = input_board[ix-DIMENSION];
+    int south = input_board[ix+DIMENSION];
+    if( north==1 && south==1 ){
+        cout << "up down == 1" << endl;
+        int sum = 0;
+        if( side == 2 ){
+            //left side is off board
+        }
+        else {
+            //left side empty
+            int nw = input_board[ix-DIMENSION-1] == 0;
+            int w = input_board[ix-1] == 0;
+            int sw = input_board[ix+DIMENSION-1] == 0;
+            sum = nw+w+sw;
+            cout << "left sum: " << sum << endl;
+        }
+
+        if( sum >= 2 ){
+            return true;
+        }
+        else{
+            if( side == 3 ){
+                //right side is off board
+                return false;
+            }
+            else {
+                int ne = input_board[ix-DIMENSION+1] == 0;
+                int e = input_board[ix+1] == 0;
+                int se = input_board[ix+DIMENSION+1] == 0;
+                sum = ne+e+se;
+                cout << "right sum: " << sum << endl;
+                if( sum >= 2 ){
+                    return true;
+                }
+            }
+        }
+    }
+    cout << "ret false: " << endl;
+    return false;
+}
+
+bool GoState::inHorizontalEdge( int* input_board, int ix ){
+    int side = getSide(ix);
+    cout << "side : " << side << endl;
+    if( side == 2 || side == 3 ){ 
+        return false; }
+
+    int east = input_board[ix+1];
+    int west = input_board[ix-1];
+    if( east==1 && west==1 ){
+        cout << "east west 1 1" << endl;
+        int sum = 0;
+
+        if( side == 1 ){
+        }
+        else {
+            //north side empty
+            int nw = input_board[ix-DIMENSION-1] == 0;
+            int n = input_board[ix-DIMENSION] == 0;
+            int ne = input_board[ix-DIMENSION+1] == 0;
+            sum = nw+n+ne;
+        }
+        cout << "north sum: " << sum << endl;
+        if( sum >= 2 ){
+            return true;
+        }
+        else{
+            if( side == 4 ){
+                return false;
+            }
+            else {
+                int sw = input_board[ix+DIMENSION-1] == 0;
+                int s = input_board[ix+DIMENSION] == 0;
+                int se = input_board[ix+DIMENSION+1] == 0;
+                sum = sw+s+se;
+                cout << "south sum: " << sum << endl;
+                if( sum >= 2 ){
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+//no OFFBOARD buffer here
+//this is absolutely horrendous
+void GoState::gaborNeighborValues( int* to_fill, int* board, int ix ){
+    int side = getSide( ix );
+    //neighborsOf( neighbor_array, ix, ADJACENCY );
+    int neighbor_array[ADJACENCY] = {ix-DIMENSION, ix+DIMENSION, ix+1, ix-1,
+                      ix-DIMENSION-1, ix-DIMENSION+1,
+                      ix+DIMENSION-1, ix+DIMENSION+1};
+    //4 0 5
+    //3 - 2
+    //6 1 7
+    if( side == 0 ){
+        int onboard[8] = {0,1,2,3,4,5,6,7};
+        for( int ob=0; ob<8; ++ob ){
+            to_fill[onboard[ob]] = board[neighbor_array[onboard[ob]]];
+        }
+    }
+
+    if( side < 10 ){
+        int onboard[5];
+        if( side == 1 ){
+            onboard[0] = 1;
+            onboard[1] = 2;
+            onboard[2] = 3;
+            onboard[3] = 6;
+            onboard[4] = 7;
+
+            to_fill[4] = -1;
+            to_fill[0] = -1;
+            to_fill[5] = -1;
+        }
+        if( side == 4 ){
+            onboard[0] = 0;
+            onboard[1] = 2;
+            onboard[2] = 3;
+            onboard[3] = 4;
+            onboard[4] = 5;
+
+            to_fill[6] = -1;
+            to_fill[1] = -1;
+            to_fill[7] = -1;
+        }
+        if( side == 2 ){
+            onboard[0] = 0;
+            onboard[1] = 1;
+            onboard[2] = 2;
+            onboard[3] = 5;
+            onboard[4] = 7;
+
+            to_fill[4] = -1;
+            to_fill[3] = -1;
+            to_fill[6] = -1;
+        }
+        if( side == 3 ){
+            onboard[0] = 0;
+            onboard[1] = 1;
+            onboard[2] = 3;
+            onboard[3] = 4;
+            onboard[4] = 6;
+
+            to_fill[5] = -1;
+            to_fill[2] = -1;
+            to_fill[7] = -1;
+        }
+        for( int ob=0; ob<5; ++ob ){
+            to_fill[onboard[ob]] = board[neighbor_array[onboard[ob]]];
+        }
+    }
+    //side 1
+    //4 0 5
+    //3 - 2 side 3
+    //6 1 7
+    //side 4
+    else {
+        int onboard[3];
+        if( side == 12 ){
+            onboard[0] = 2;
+            onboard[1] = 7;
+            onboard[2] = 1;
+            to_fill[6] = -1;
+            to_fill[3] = -1;
+            to_fill[4] = -1;
+            to_fill[0] = -1;
+            to_fill[5] = -1;
+        }
+        if( side == 13 ){
+            onboard[0] = 3;
+            onboard[1] = 6;
+            onboard[2] = 1;
+            to_fill[4] = -1;
+            to_fill[0] = -1;
+            to_fill[5] = -1;
+            to_fill[2] = -1;
+            to_fill[7] = -1;
+        }
+        if( side == 42 ){
+            onboard[0] = 0;
+            onboard[1] = 5;
+            onboard[2] = 2;
+            to_fill[4] = -1;
+            to_fill[3] = -1;
+            to_fill[6] = -1;
+            to_fill[1] = -1;
+            to_fill[7] = -1;
+        }
+        if( side == 43 ){
+            onboard[0] = 3;
+            onboard[1] = 4;
+            onboard[2] = 0;
+            to_fill[5] = -1;
+            to_fill[2] = -1;
+            to_fill[7] = -1;
+            to_fill[1] = -1;
+            to_fill[6] = -1;
+        }
+        for( int ob=0; ob<3; ++ob ){
+            to_fill[onboard[ob]] = board[neighbor_array[onboard[ob]]];
+        }
+    }
+
+}
+
+//42 matches anything
+//0 can only match a 0 or a -1 (offboard from gaborNeighborValues)
+//1 can only match 1
+bool matchesPattern( int* neighbors, int* pattern ){
+    int n_zero_matches = 0;
+    int n_one_matches = 0;
+    int n_pattern_zeros = 0;
+    for( int i=0; i<ADJACENCY; i++ ){
+        int p = pattern[i];
+        int n = neighbors[i];
+        if( p == 42 ){ continue; }
+        else if( p == 0 ){
+            ++n_pattern_zeros;
+            if( n == 0 ){
+                ++n_zero_matches;
+            }
+        }
+        else if( p == 1 ){
+            if( n == 1){
+                ++n_one_matches;
+            }
+        }
+        else{ assert(false); }
+    }
+    return n_one_matches == 2 && n_zero_matches == n_pattern_zeros;
+}
+
+void GoState::gabor( int* input_board, int* output_board ){
+    for( int ix=0; ix<MAX_EMPTY; ++ix ){
+        output_board[ix] = 0;
+        if( input_board[ix] == 1 ){ //&& ! isBorderGabor(ix) ){
+            //cout << "ix: " << ix << endl;
+            int nvalues[ADJACENCY];
+            gaborNeighborValues( nvalues, input_board, ix );
+            
+            //4 0 5
+            //3 - 2
+            //6 1 7
+            const int npatterns = 24;
+            int patterns[npatterns][ADJACENCY] = 
+                //vert, lside 0
+                {{1,1,42,0,0,42,0,42}, 
+                //vert, rside 0
+                {1,1,0,42,42,0,42,0},
+                //horz, uside 0
+                {0,42,1,1,0,0,42,42},
+                //horz, bside 0
+                {42,0,1,1,42,42,0,0},
+                {42,1,0,42,42,1,42,0}, //updog r, "inside 0"
+                {0,1,42,0,0,1,0,42},    //updog r, "outside 0"
+                {42,1,42,0,1,42,0,42}, //updog l, i 0
+                {0,1,0,42,1,0,42,0},   //updog l, o 0
+                {1,42,0,42,42,0,42,1}, //downdog r, i 0
+                {1,0,42,0,0,42,0,1},   //downdog r, o 0
+                {1,42,42,0,0,42,1,42}, //downdog l, i 0
+                {1,0,0,42,42,0,1,0},   //downdog l, o 0
+                {0,42,42,1,0,1,42,42}, //rightdog up, i 0
+                {42,0,0,1,42,1,0,0},   //rightdog up, o 0
+                {42,0,42,1,42,42,0,1}, //rightdog down, i 0
+                {0,42,0,1,0,0,42,1},   //rightdog down, o 0
+                {42,0,1,42,42,42,1,0}, //leftdog u, i 0
+                {0,42,1,0,0,0,1,42},   //leftdog u, o 0 
+                {0,42,1,42,1,0,42,42},  //leftdog d, i 0 
+                {42,0,1,0,1,42,0,0},   //leftdog d, o 0
+                {42,0,0,42,42,1,1,0},  //rdiag, 0 down
+                {0,42,42,0,0,1,1,42},  //rdiag, 0 up
+                {0,42,0,42,1,0,42,1},  //ldiag, 0 up
+                {42,0,42,0,1,42,0,1}   //ldiag, 0 down
+                };
+        
+            for( int i=0; i<npatterns; ++i ){
+                bool match = matchesPattern( nvalues, patterns[i] );
+                if( match ){
+                    output_board[ix] = 1;
+                    break;
+                }
+            }
+
+
+            //for( int i=0; i<ADJACENCY; ++i ){
+            //cout << nvalues[i] << ",";
+            //}
+            //cout << endl;
+
+            //neighborsOf(ix)
+            //map this array to their colors
+            //iterate through all the neighbor patterns
+            //1 * *
+            //0 1 *  ->  [42 0 42 0 1 42 0 1]
+            //0 0 1a
+            //neighborsOf returns neighbs in this order:
+            //N,S,E,W,NW,NE,SW,SE
+            //*'s mean don't care, 1's and 0's must match between
+            //template and neighbors
+            //for each neighbor pattern, sum the # of matching 1,0's
+            //if num matching 1's = total # of 1's
+            //and num matching 0's >= total # of 0's - 1
+            //then we say ix is a edge point.
+            //Can break from template iteration matching
+
+
+            //if( inVerticalEdge( input_board, ix ) ){
+            //output_board[ix] = 1;
+            //continue;
+            //}
+            //else if( inHorizontalEdge( input_board, ix ) ){
+            //output_board[ix] = 1;
+            //continue;
+            //}
+            //
+            //}
+            //output_board[ix] = 0;
+        }
+    }
+}
+
 void GoState::MATLAB2board( double* matlab_board ){
     for( int ix=0; ix<MAX_EMPTY; ix++ ){
         int bufferix = GoState::nobufferix2bufferix(ix);
@@ -336,9 +681,11 @@ char GoState::action2color( int action ){
     return (action > 0) ? WHITE : BLACK;
 }
 
-int GoState::ix2color( int ix ){
+char GoState::ix2color( int ix ){
     return isBorder(ix) ? OFFBOARD : board[ix];
 }
+
+
 
 int GoState::coord2ix( int i, int j ){
     return BIGDIM*i + j;
@@ -421,13 +768,38 @@ void GoState::capture(){
     //}
 }
 
-inline bool GoState::isBorder( int ix ){
+bool GoState::isBorder( int ix ){
     if( ix <= BIGDIM-1 ){ return true; }
     else if( ix % BIGDIM == 0 ){return true; }
     else if( ix % BIGDIM == BIGDIM-1 ){ return true; }
     else if( BIGDIM*(BIGDIM-1) <= ix ){return true;}
     else{ return false; }
 }
+
+int GoState::getSide( int ix ){
+    if( ix <= DIMENSION-1 ){ 
+        if( ix % DIMENSION == 0 ){
+            return 12;
+        }
+        if( ix % DIMENSION == DIMENSION-1 ){
+            return 13;
+        }
+        return 1;
+    }
+    else if( DIMENSION*(DIMENSION-1) <= ix ){
+        if( ix % DIMENSION == 0 ){
+            return 42;
+        }
+        if( ix % DIMENSION == DIMENSION-1 ){
+            return 43;
+        }
+        return 4;
+    }
+    else if( ix % DIMENSION == 0 ){return 2; }
+    else if( ix % DIMENSION == DIMENSION-1 ){ return 3; }
+    else{ return 0; }
+}
+
 
 
 void GoState::neighborsOf2( int* to_fill, int* to_fill_len,

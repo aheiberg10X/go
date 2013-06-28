@@ -17,6 +17,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <fstream>
 
 using namespace std;
 
@@ -84,7 +85,6 @@ private :
 
     char action2color( int action );
 
-
     int coord2ix( int i, int j );
 
     int ixColor2Action( int ix, char color );
@@ -104,7 +104,7 @@ private :
     void capture();
 
     bool isBorder( int ix );
-
+    
     void neighborsOf( int* to_fill, int ix, int adjacency );
 
     void neighborsOf2( int* to_fill, int* to_fill_len,
@@ -165,6 +165,9 @@ public :
     string toString( );
     string featuresToString(int* features, int nfeatures);
 
+    static void board2csv( float* board, int size, int width, string filename );
+    
+
     static string prettyBoard( string* board, int gap );
 
     /////////////////////////////////////////////////////////
@@ -183,7 +186,7 @@ public :
 
     static int nobufferix2bufferix( int ix );
     
-    int ix2color( int ix );
+    char ix2color( int ix );
 
     bool floodFill (int epicenter_ix,
                     int adjacency,
@@ -201,7 +204,15 @@ public :
     //return man dist to <friend,foe>
     pair<int,int> getManhattanDistPair( int ix );
 
-    //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
+    bool inHorizontalEdge( int* input_board, int ix );
+    bool inVerticalEdge( int* input_board, int ix );
+    void gabor( int* input_board, int* output_board );
+    int ix2colorGabor( int ix, int* myboard );
+    void gaborNeighborValues( int* to_fill, int* board, int ix );
+    int getSide( int ix );
+
+    
+        //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/
 
 };

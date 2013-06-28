@@ -1,4 +1,4 @@
-CFLAGS= -pg #-O3 -fopenmp
+CFLAGS= -O3 -fopenmp
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
@@ -22,8 +22,8 @@ omp:
 benchmark: kernel.o 
 	${CMPLR} -o kernel kernel.o ${CFLAGS}
 
-shared: kernel.o mcts.o go.o
-	${CMPLR} -o kernel queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o ${CFLAGS} \
+shared: kernel.o mcts.o go.o gaussian.o
+	${CMPLR} -o kernel queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o gaussianiir2d.o ${CFLAGS} \
 	-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
 	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
 
@@ -41,7 +41,8 @@ mcts_node.o:
 #godomain.o: 
 	#${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
 
-
+gaussian.o :
+	${CMPLR} -c gaussian/gaussianiir2d.c ${CFLAGS}
 
 go.o:
 	${CMPLR} -c go.cpp ${INC} ${CFLAGS} \

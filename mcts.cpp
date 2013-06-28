@@ -2,17 +2,18 @@
 #include <iostream>
 #include <math.h>
 #include <vector>
+#include "matrix.h"
+#include <time.h>
 
 #include "mcts.h"
+
 //break in abstraction for valuePolicy 
 #include "gostate.h"
 #include "weights.h"
-
-//value function
 #include "value_functions/value2.h"
 
-#include "matrix.h"
-#include <time.h>
+#include "gaussian/gaussianiir2d.h"
+
 
 using namespace std;
 
@@ -238,16 +239,47 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
     return node;
 }
 
-
-//breaking abstraction
-//but get over it
+//breaking abstraction, get over it
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                               MCTS_State* state ){
 
     const int nfeatures = 31;
-    int features[ nfeatures * MAX_EMPTY ] = {0};
-    ((GoState*) state)->setBinaryFeatures( features, nfeatures );
-    //convolution
+    const int features_size = nfeatures*MAX_EMPTY;
+    int features[ features_size ] = {0};
+    GoState* gs = (GoState*) state;
+    gs->setBinaryFeatures( features, nfeatures );
+
+    //gaussian convolution
+    int num_steps = 2;
+
+    float local_sigma = .5;
+    float local_gaussian[ features_size ];
+    //memcpy( local_gaussian, features, sizeof(int)*features_size );
+    copy( features, features + features_size, local_gaussian );
+    
+    float meso_sigma = 1;
+    float meso_gaussian[ features_size ];
+    //memcpy( meso_gaussian, features, sizeof(int)*featuress_size
+    copy( features, features + features_size, meso_gaussian );
+
+    int edges[ features_size ];
+    memcpy( edges, features, sizeof(int)*features_size );
+
+    for( int f=0; f<nfeatures; ++f ){
+        gaussianiir2d( &local_gaussian[f*MAX_EMPTY], 
+                       DIMENSION, DIMENSION, 
+                       local_sigma, 
+                       num_steps );
+
+        gaussianiir2d( &meso_gaussian[f*MAX_EMPTY], 
+                       DIMENSION, DIMENSION, 
+                       meso_sigma, 
+                       num_steps );
+
+        gs->gabor( &features[f*MAX_EMPTY], &edges[f*MAX_EMPTY] );
+        
+    }
+
     //cross-correlation
 }
 

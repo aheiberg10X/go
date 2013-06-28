@@ -1,4 +1,3 @@
-//#include "gostate.h"
 #include "gostate.h"
 //#include "godomain.cpp"
 #include "mcts.h"
@@ -14,6 +13,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <time.h>
+#include <fstream>
 
 //hard coded data
 #include "weights.h"
@@ -21,6 +21,8 @@
 
 //value function
 #include "value_functions/value2.h"
+
+#include "gaussian/gaussianiir2d.h"
 
 using namespace std;
 
@@ -40,9 +42,13 @@ void testValuePolicy(){
     //gss->applyAction(2*BIGDIM+4,true);
     //cout << gss->toString() << endl;
 
-    //mcts.valuePolicy( dummy_node, gss );
-    string dummy[BOARDSIZE];
-    cout << GoState::prettyBoard( dummy, 4 );
+    clock_t t1 = clock();
+    for( int i = 0; i<1000; ++i ){
+        mcts.valuePolicy( dummy_node, gss );
+    }
+    clock_t t2 = clock();
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
 };
 
 void testDefaultPolicy(){
@@ -151,7 +157,6 @@ void playGame(/*params for treePolicy configuration*/){
     //do something with the results
 };
 
-
 //based on 5x5 board
 void testManhattanDist(){
     ZobristHash* zh = new ZobristHash;
@@ -191,16 +196,23 @@ void testSetBinaryFeatures(){
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
     GoState gss(zh);
-
-    gss.applyAction(3*BIGDIM+3,true);
-    gss.applyAction(3*BIGDIM+2,true);
-    gss.applyAction(2*BIGDIM+3,true);
+    gss.MATLAB2board( game1234 );
+    cout << gss.toString() << endl;
     gss.setBinaryFeatures( features, nfeatures );
 
     cout << "done setting" << endl;
 
-    string feature_str = gss.featuresToString( features, nfeatures );
-    cout << feature_str << endl;
+    float features_copy[nfeatures * MAX_EMPTY];
+    copy( features, features + nfeatures*MAX_EMPTY, features_copy );
+
+    //string feature_str = gss.featuresToString( features, nfeatures );
+    //cout << feature_str << endl;
+
+    int feat = 21;
+    //GoState::board2csv( &features_copy[feat*MAX_EMPTY], MAX_EMPTY, DIMENSION, "feat21_unconvolved.csv" );
+    gaussianiir2d( &features_copy[feat*MAX_EMPTY], DIMENSION, DIMENSION, 1, 2 );
+    GoState::board2csv( &features_copy[feat*MAX_EMPTY], MAX_EMPTY, DIMENSION, "feat21_convolved_sigma1_2steps.csv" );
+
 
 }
 
@@ -215,9 +227,14 @@ void timeSetBinaryFeatures(){
 
     const int nfeatures = 31;
     int features[ nfeatures * MAX_EMPTY ] = {0};
+    float features_copy[nfeatures * MAX_EMPTY];
 
     for( int i=0; i<10000; ++i ){
         gss->setBinaryFeatures( features, nfeatures ); 
+        copy( features, features + nfeatures*MAX_EMPTY, features_copy );
+        for( int feat=1; feat<nfeatures; ++feat ){
+            gaussianiir2d( &features_copy[feat*MAX_EMPTY], DIMENSION, DIMENSION, 1, 2 );
+        }
         //if( i == 0 ){
         //cout << gss->featuresToString( features, nfeatures ) << endl;
         //}
@@ -227,6 +244,61 @@ void timeSetBinaryFeatures(){
     cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
 }
 
+void testConvolution(){
+    float image[9] = {1,1,1,2,2,2,3,3,3};
+    int width = 3;
+    int height = 3;
+    float sigma = 1;
+    int numsteps = 100;
+    gaussianiir2d( image, width, height, sigma, numsteps );
+    for( int i=0; i<width*height; i++ ){
+        if( i % width == 0 ){
+            cout << endl;
+        }
+        cout << image[i] << ", ";
+    }
+
+    GoState::board2csv( image, 9, width, "test_convolution.csv" );
+
+
+}
+
+void testGabor(){
+    ZobristHash* zh = new ZobristHash;
+    zh->ctor();
+    GoState gss(zh);
+    //gss.MATLAB2board( game8 );
+    //gss.MATLAB2board( game23 );
+    gss.MATLAB2board( game112 );
+    //gss.MATLAB2board( game1001 );
+    //gss.MATLAB2board( game1234 );
+    cout << gss.toString() << endl;
+
+    const int nfeatures = 31;
+    int features[ nfeatures * MAX_EMPTY ] = {0};
+    gss.setBinaryFeatures( features, nfeatures );
+
+    int feat = 1;
+    int output_board[MAX_EMPTY];
+    
+    //string empty_str = gss.featuresToString( &features[feat*MAX_EMPTY], 1 );
+    //cout << empty_str << endl;
+
+    float feat_copy[MAX_EMPTY];
+    copy( &features[feat*MAX_EMPTY], &features[feat*MAX_EMPTY] + MAX_EMPTY,
+          feat_copy );
+    GoState::board2csv( feat_copy, MAX_EMPTY, DIMENSION, "game112_feat1.csv" );
+
+    gss.gabor( &features[feat*MAX_EMPTY], output_board );
+
+    //string feature_str = gss.featuresToString( output_board, 1 );
+    //cout << feature_str << endl;
+
+    float output_copy[MAX_EMPTY];
+    copy( output_board, output_board + MAX_EMPTY, output_copy );
+    GoState::board2csv( output_copy, MAX_EMPTY, DIMENSION, "game112_feat1_edges.csv" );
+}
+
 int main(){
     srand(time(0));
     cout << sizeof(GoState) << endl;
@@ -234,12 +306,16 @@ int main(){
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
-    //testValuePolicy();
+    testValuePolicy();
     //testDefaultPolicy();
     //playGame();
     //testManhattanDist();
     //testSetBinaryFeatures();
-    timeSetBinaryFeatures();
+    //timeSetBinaryFeatures();
+    
+    //testConvolution();
+    
+    //testGabor();
    
     //value2Terminate();
     //mclTerminateApplication();
