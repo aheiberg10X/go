@@ -13,6 +13,7 @@
 #include "value_functions/value2.h"
 
 #include "gaussian/gaussianiir2d.h"
+#include "feature_funcs.h"
 
 
 using namespace std;
@@ -247,7 +248,7 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
     const int features_size = nfeatures*MAX_EMPTY;
     int features[ features_size ] = {0};
     GoState* gs = (GoState*) state;
-    gs->setBinaryFeatures( features, nfeatures );
+    FeatureFuncs::setBinaryFeatures( gs, features, nfeatures );
 
     //gaussian convolution
     int num_steps = 2;
@@ -276,7 +277,7 @@ MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                        meso_sigma, 
                        num_steps );
 
-        gs->gabor( &features[f*MAX_EMPTY], &edges[f*MAX_EMPTY] );
+        FeatureFuncs::setEdges( &features[f*MAX_EMPTY], &edges[f*MAX_EMPTY] );
         
     }
 

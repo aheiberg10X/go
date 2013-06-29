@@ -4,7 +4,6 @@ LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
 
 all: clean shared
-#all : clean_omp omp
 #all : clean_cross cross_corr
 
 ######################################################################
@@ -12,20 +11,15 @@ all: clean shared
 cross_corr:
 	nvcc cross_corr_kernel.cu -o cross_kernel
 
-######################################################################
-
-omp:
-	g++ omp.cpp -o omp ${CFLAGS}
-
 ########################################################################
 
-benchmark: kernel.o 
-	${CMPLR} -o kernel kernel.o ${CFLAGS}
-
-shared: kernel.o mcts.o go.o gaussian.o
-	${CMPLR} -o kernel queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o gaussianiir2d.o ${CFLAGS} \
+shared: kernel.o mcts.o go.o gaussian.o feature_funcs.o
+	${CMPLR} -o kernel feature_funcs.o queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o gaussianiir2d.o ${CFLAGS} \
 	-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
 	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
+
+feature_funcs.o :
+	${CMPLR} -c feature_funcs.cpp ${CFLAGS}
 
 kernel.o:
 	#${CMPLR} -c kernel.cpp ${CFLAGS}
@@ -38,9 +32,6 @@ mcts.o : mcts_node.o
 mcts_node.o: 
 	${CMPLR} -c mcts_node.cpp ${CFLAGS}
 
-#godomain.o: 
-	#${CMPLR} -c godomain.cpp ${INC} ${CFLAGS}
-
 gaussian.o :
 	${CMPLR} -c gaussian/gaussianiir2d.c ${CFLAGS}
 
@@ -50,20 +41,8 @@ go.o:
 
 ######################################################################
 
-cleango:
-	rm -f go.o go
-
 clean_cross:
 	rm -f cross_kernel cross_corr_kernel.o
-
-clean_omp :
-	rm -f omp omp.o
-
-clean_linktest:
-	rm -f linktest linktest.o
-
-clean_valuetest :
-	rm -f valuetest valuetest.o
 
 clean:
 	rm -rf *.o go kernel

@@ -23,6 +23,7 @@
 #include "value_functions/value2.h"
 
 #include "gaussian/gaussianiir2d.h"
+#include "feature_funcs.h"
 
 using namespace std;
 
@@ -172,7 +173,7 @@ void testManhattanDist(){
     gss->applyAction(BIGDIM+5,true);
     gss->applyAction(3*BIGDIM+2,true);
     cout << gss->toString() << endl;
-    dists = gss->getManhattanDistPair( 3*BIGDIM+3 );
+    dists = FeatureFuncs::getManhattanDistPair( gss, 3*BIGDIM+3 );
     assert( dists.first == 1 && dists.second == 4 );
     delete gss;
 
@@ -182,7 +183,7 @@ void testManhattanDist(){
     gss->applyAction(BIGDIM+5,true);
     gss->applyAction(5*BIGDIM+5,true);
     cout << gss->toString() << endl;
-    dists = gss->getManhattanDistPair( 5*BIGDIM+5 );
+    dists = FeatureFuncs::getManhattanDistPair( gss, 5*BIGDIM+5 );
     assert( dists.first == 8 && dists.second == 4 );
     delete gss;
 
@@ -198,7 +199,7 @@ void testSetBinaryFeatures(){
     GoState gss(zh);
     gss.MATLAB2board( game1234 );
     cout << gss.toString() << endl;
-    gss.setBinaryFeatures( features, nfeatures );
+    FeatureFuncs::setBinaryFeatures( &gss, features, nfeatures );
 
     cout << "done setting" << endl;
 
@@ -211,7 +212,7 @@ void testSetBinaryFeatures(){
     int feat = 21;
     //GoState::board2csv( &features_copy[feat*MAX_EMPTY], MAX_EMPTY, DIMENSION, "feat21_unconvolved.csv" );
     gaussianiir2d( &features_copy[feat*MAX_EMPTY], DIMENSION, DIMENSION, 1, 2 );
-    GoState::board2csv( &features_copy[feat*MAX_EMPTY], MAX_EMPTY, DIMENSION, "feat21_convolved_sigma1_2steps.csv" );
+    FeatureFuncs::board2csv( &features_copy[feat*MAX_EMPTY], MAX_EMPTY, DIMENSION, "feat21_convolved_sigma1_2steps.csv" );
 
 
 }
@@ -230,7 +231,7 @@ void timeSetBinaryFeatures(){
     float features_copy[nfeatures * MAX_EMPTY];
 
     for( int i=0; i<10000; ++i ){
-        gss->setBinaryFeatures( features, nfeatures ); 
+        FeatureFuncs::setBinaryFeatures( gss, features, nfeatures ); 
         copy( features, features + nfeatures*MAX_EMPTY, features_copy );
         for( int feat=1; feat<nfeatures; ++feat ){
             gaussianiir2d( &features_copy[feat*MAX_EMPTY], DIMENSION, DIMENSION, 1, 2 );
@@ -258,7 +259,7 @@ void testConvolution(){
         cout << image[i] << ", ";
     }
 
-    GoState::board2csv( image, 9, width, "test_convolution.csv" );
+    FeatureFuncs::board2csv( image, 9, width, "test_convolution.csv" );
 
 
 }
@@ -276,7 +277,7 @@ void testGabor(){
 
     const int nfeatures = 31;
     int features[ nfeatures * MAX_EMPTY ] = {0};
-    gss.setBinaryFeatures( features, nfeatures );
+    FeatureFuncs::setBinaryFeatures( &gss, features, nfeatures );
 
     int feat = 1;
     int output_board[MAX_EMPTY];
@@ -287,16 +288,16 @@ void testGabor(){
     float feat_copy[MAX_EMPTY];
     copy( &features[feat*MAX_EMPTY], &features[feat*MAX_EMPTY] + MAX_EMPTY,
           feat_copy );
-    GoState::board2csv( feat_copy, MAX_EMPTY, DIMENSION, "game112_feat1.csv" );
+    FeatureFuncs::board2csv( feat_copy, MAX_EMPTY, DIMENSION, "game112_feat1.csv" );
 
-    gss.gabor( &features[feat*MAX_EMPTY], output_board );
+    FeatureFuncs::setEdges( &features[feat*MAX_EMPTY], output_board );
 
     //string feature_str = gss.featuresToString( output_board, 1 );
     //cout << feature_str << endl;
 
     float output_copy[MAX_EMPTY];
     copy( output_board, output_board + MAX_EMPTY, output_copy );
-    GoState::board2csv( output_copy, MAX_EMPTY, DIMENSION, "game112_feat1_edges.csv" );
+    FeatureFuncs::board2csv( output_copy, MAX_EMPTY, DIMENSION, "game112_feat1_edges.csv" );
 }
 
 int main(){

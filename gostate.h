@@ -17,7 +17,6 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <fstream>
 
 using namespace std;
 
@@ -72,8 +71,6 @@ private :
     void freezeBoard();
 
     void thawBoard();
-
-    char flipColor( char c );
 
     void togglePlayer( );
 
@@ -165,9 +162,6 @@ public :
     string toString( );
     string featuresToString(int* features, int nfeatures);
 
-    static void board2csv( float* board, int size, int width, string filename );
-    
-
     static string prettyBoard( string* board, int gap );
 
     /////////////////////////////////////////////////////////
@@ -198,21 +192,9 @@ public :
     
     vector<int> getMarkedGroup();
 
-    //for mcts.valuePolicy
-    void setBinaryFeatures(int* features, int nfeatures);
+    char flipColor( char c );
 
-    //return man dist to <friend,foe>
-    pair<int,int> getManhattanDistPair( int ix );
-
-    bool inHorizontalEdge( int* input_board, int ix );
-    bool inVerticalEdge( int* input_board, int ix );
-    void gabor( int* input_board, int* output_board );
-    int ix2colorGabor( int ix, int* myboard );
-    void gaborNeighborValues( int* to_fill, int* board, int ix );
-    int getSide( int ix );
-
-    
-        //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
+    //an version for checking territory status that does not rely on fact that only single poitions will be left empty when game ends
     /*void getRewardsComplete( int* to_fill );*/
 
 };
