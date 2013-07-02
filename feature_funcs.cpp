@@ -1,6 +1,54 @@
 #include "feature_funcs.h"
 
 
+//some experimenting
+float FeatureFuncs::naivePointMult( float* a, float* b, int size ){
+    float sum = 0;
+    for( int i=0; i<size; i++ ){
+        sum += a[i] * b[i];
+    }
+    return sum;
+}
+
+float FeatureFuncs::interleavedPointMult( float* a, int size ){
+    float sum = 0;
+    for( int i=0; i<size; i+=2 ){
+        sum += a[i]*a[i+1];
+        //cout << a[i] << " , " << a[i+1] << " , " << a[i]*a[i+1] << endl;
+        //cout << "m: " << sum << endl;
+    }
+    return sum;
+}
+
+void FeatureFuncs::crossCorrelate( int* binary_features,
+                                   float* convolved_features, 
+                                   float* results ){
+
+    for( int i=0; i<NFEATURES; ++i ){
+        int binary_offset = i * MAX_EMPTY;
+        //cout << "binary_offset: " << binary_offset << endl;
+        for( int j=0; j<NCONVOLUTIONS; ++j ){
+            int rough_convolved_offset = j * NFEATURES * MAX_EMPTY;
+            //cout << "rough: " << rough_convolved_offset << endl;
+            for( int k=0; k<NFEATURES; ++k ){
+                int convolved_offset = rough_convolved_offset + k * MAX_EMPTY; 
+                //cout << "conv_offset: " << convolved_offset << endl;
+                //inner
+                float sum = 0;
+                for(int l=0; l<MAX_EMPTY; ++l ){
+                    int b = binary_features[ binary_offset + l ];
+                    float c = convolved_features[ convolved_offset + l ];
+                    sum += b*c;
+                }
+                //put sum in results
+                int rix = (i*NFEATURES*NCONVOLUTIONS) + (j*NFEATURES) + (k);
+                //cout << "sum: " << sum << " to results ix: " << rix << endl;
+                results[rix] = sum;
+            }
+        }
+    }
+}
+
 //take the feature board, and the ix and compute
 //the offset in the feature array
 //PERF TODO: if we compute nbix once ahead of time, will save a bit
@@ -12,7 +60,7 @@ int FeatureFuncs::featureIX( int feature, int ix ){
     }
 }
 
-void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures ){
+void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features ){
     //the group numbers for every intersection.  -1 for offboards and empties
     int group_id = 0;
     int group_assignments[BOARDSIZE];
@@ -59,14 +107,13 @@ void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures 
     }
     
     // features' vector (binary, 1x20)
-    // 1 = off-limit goban
-    // 2 = empty intersection 
-    // 3 = isolated Black stone
-    // 4 = isolated White stone
-    // 5 = all Black stones
-    // 6-12 = # liberties for a Black group 1, 2, 3, 4, 5-6, 7-9, 10 or more
-    // 13 = all White stones 
-    // 14-20 = # liberties for a White group 1, 2, 3, 4, 5-6, 7-9, 10 or more
+    // 0 = empty intersection 
+    // 1 = isolated Black stone
+    // 2 = isolated White stone
+    // 3 = all Black stones
+    // 4-10 = # liberties for a Black group 1, 2, 3, 4, 5-6, 7-9, 10 or more
+    // 11 = all White stones 
+    // 12-18 = # liberties for a White group 1, 2, 3, 4, 5-6, 7-9, 10 or more
         
     for(int ix=0; ix<BOARDSIZE; ++ix){
         
@@ -80,7 +127,7 @@ void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures 
         }
         if( color == EMPTY ){
             //1 is the empty/not feature board
-            fix = featureIX(1,ix);
+            fix = featureIX(0,ix);
             features[ fix ] = 1;
 
             //examine group id's of 4 neighbors to see if this empty
@@ -108,26 +155,26 @@ void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures 
                 else assert(false);
 
                 //if black:
-                //feature boards 5-8 : sizes 1-4
-                //               9   : sizes 5-6
-                //              10   : sizes 7-9
-                //              11   : sizes > 10
+                //feature boards 4-7 : sizes 1-4
+                //               8   : sizes 5-6
+                //               9   : sizes 7-9
+                //              10   : sizes > 10
                 //if white: each feature index+8
                 int feature = color_feature_offset;
                 if( 1 <= ngroup_size && ngroup_size <= 4 ){
-                    feature +=  ngroup_size + 4;
+                    feature +=  ngroup_size + 3;
                     features[ featureIX(feature,ix) ] = 1;
                 }
                 else if( ngroup_size == 5 || ngroup_size == 6 ){
-                    feature += 9;
+                    feature += 8;
                     features[ featureIX(feature,ix) ] = 1;
                 }
                 else if( 7 <= ngroup_size && ngroup_size <= 9 ){
-                    feature += 10;
+                    feature += 9;
                     features[ featureIX(feature,ix) ] = 1;
                 }
                 else{
-                    feature += 11;
+                    feature += 10;
                     features[ featureIX(feature,ix) ] = 1;
                 }
             }
@@ -139,18 +186,18 @@ void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures 
             if( color == BLACK ){
                 if( group_size == 1 ){
                     //2 : isolated
-                    features[ featureIX(2,ix) ] = 1;
+                    features[ featureIX(1,ix) ] = 1;
                 }
                 //4 : all black
-                features[ featureIX(4,ix) ] = 1;
+                features[ featureIX(3,ix) ] = 1;
             }
             else if( color == WHITE ){
                 if( group_size == 1 ){
                     //3 : isolated
-                    features[ featureIX(3,ix) ] = 1;
+                    features[ featureIX(2,ix) ] = 1;
                 }
                 //12 : all white
-                features[ featureIX(12,ix) ] = 1;
+                features[ featureIX(11,ix) ] = 1;
             }
             else assert(false);
 
@@ -177,27 +224,27 @@ void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features, int nfeatures 
             int foe_dist = dists.second;
             int diff = friend_dist - foe_dist;
             if( diff == 0 )       
-                features[ featureIX(20,ix) ] = 1;
+                features[ featureIX(19,ix) ] = 1;
             else if( diff == -1 ) 
-                features[ featureIX(21,ix) ] = 1;
+                features[ featureIX(20,ix) ] = 1;
             else if( diff == -2 || diff == -3 ) 
-                features[ featureIX(22,ix) ] = 1;
+                features[ featureIX(21,ix) ] = 1;
             else if( diff == -4 || diff == -5 ) 
-                features[ featureIX(23,ix) ] = 1;
+                features[ featureIX(22,ix) ] = 1;
             else if( -8 <= diff && diff <= -6 ) 
-                features[ featureIX(24,ix) ] = 1;
+                features[ featureIX(23,ix) ] = 1;
             else if( diff <= -8 ) 
-                features[ featureIX(25,ix) ] = 1;
+                features[ featureIX(24,ix) ] = 1;
             else if( diff == 1 ) 
-                features[ featureIX(26,ix) ] = 1;
+                features[ featureIX(25,ix) ] = 1;
             else if( diff == 2 || diff == 3 ) 
-                features[ featureIX(27,ix) ] = 1;
+                features[ featureIX(26,ix) ] = 1;
             else if( diff == 4 || diff == 5 ) 
-                features[ featureIX(28,ix) ] = 1;
+                features[ featureIX(27,ix) ] = 1;
             else if( 6 <= diff && diff <= 8 ) 
-                features[ featureIX(29,ix) ] = 1;
+                features[ featureIX(28,ix) ] = 1;
             else if( diff >= 8 ) 
-                features[ featureIX(30,ix) ] = 1;
+                features[ featureIX(29,ix) ] = 1;
 
         }
     }
@@ -365,7 +412,7 @@ bool FeatureFuncs::matchesPattern( int* neighbors, int* pattern ){
     return n_one_matches == 2 && n_zero_matches == n_pattern_zeros;
 }
 
-void FeatureFuncs::setEdges( int* input_board, int* output_board ){
+void FeatureFuncs::setEdges( int* input_board, float* output_board ){
     for( int ix=0; ix<MAX_EMPTY; ++ix ){
         output_board[ix] = 0;
         if( input_board[ix] == 1 ){ //&& ! isBorderGabor(ix) ){
@@ -553,6 +600,11 @@ int FeatureFuncs::getSide( int ix ){
 }
 
 
+
+
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
 
 /*
 bool FeatureFuncs::inVerticalEdge( int* input_board, int ix ){

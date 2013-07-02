@@ -3,6 +3,12 @@
 
 #include <math.h>
 
+/////////////////////////////
+//   FeatureFuncs params
+//   ////////////////////////
+#define NFEATURES 30
+#define NCONVOLUTIONS 3 
+
 //Use the GPU? Moved on a l0ong time ago...
 /*#define USE_GPU false*/
 #define N_ROOT_THREADS 1

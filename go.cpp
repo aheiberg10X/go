@@ -191,22 +191,21 @@ void testManhattanDist(){
 }
 
 void testSetBinaryFeatures(){
-    const int nfeatures = 31;
-    int features[ nfeatures * MAX_EMPTY ] = {0};
+    int features[ NFEATURES * MAX_EMPTY ] = {0};
 
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
     GoState gss(zh);
     gss.MATLAB2board( game1234 );
     cout << gss.toString() << endl;
-    FeatureFuncs::setBinaryFeatures( &gss, features, nfeatures );
+    FeatureFuncs::setBinaryFeatures( &gss, features );
 
     cout << "done setting" << endl;
 
-    float features_copy[nfeatures * MAX_EMPTY];
-    copy( features, features + nfeatures*MAX_EMPTY, features_copy );
+    float features_copy[NFEATURES * MAX_EMPTY];
+    copy( features, features + NFEATURES*MAX_EMPTY, features_copy );
 
-    //string feature_str = gss.featuresToString( features, nfeatures );
+    //string feature_str = gss.featuresToString( features, NFEATURES );
     //cout << feature_str << endl;
 
     int feat = 21;
@@ -226,18 +225,17 @@ void timeSetBinaryFeatures(){
     gss->MATLAB2board( game1234 );
     cout << gss->toString() << endl;
 
-    const int nfeatures = 31;
-    int features[ nfeatures * MAX_EMPTY ] = {0};
-    float features_copy[nfeatures * MAX_EMPTY];
+    int features[ NFEATURES * MAX_EMPTY ] = {0};
+    float features_copy[NFEATURES * MAX_EMPTY];
 
     for( int i=0; i<10000; ++i ){
-        FeatureFuncs::setBinaryFeatures( gss, features, nfeatures ); 
-        copy( features, features + nfeatures*MAX_EMPTY, features_copy );
-        for( int feat=1; feat<nfeatures; ++feat ){
+        FeatureFuncs::setBinaryFeatures( gss, features ); 
+        copy( features, features + NFEATURES*MAX_EMPTY, features_copy );
+        for( int feat=1; feat<NFEATURES; ++feat ){
             gaussianiir2d( &features_copy[feat*MAX_EMPTY], DIMENSION, DIMENSION, 1, 2 );
         }
         //if( i == 0 ){
-        //cout << gss->featuresToString( features, nfeatures ) << endl;
+        //cout << gss->featuresToString( features, NFEATURES ) << endl;
         //}
     }
 
@@ -275,12 +273,11 @@ void testGabor(){
     //gss.MATLAB2board( game1234 );
     cout << gss.toString() << endl;
 
-    const int nfeatures = 31;
-    int features[ nfeatures * MAX_EMPTY ] = {0};
-    FeatureFuncs::setBinaryFeatures( &gss, features, nfeatures );
+    int features[ NFEATURES * MAX_EMPTY ] = {0};
+    FeatureFuncs::setBinaryFeatures( &gss, features );
 
     int feat = 1;
-    int output_board[MAX_EMPTY];
+    float output_board[MAX_EMPTY];
     
     //string empty_str = gss.featuresToString( &features[feat*MAX_EMPTY], 1 );
     //cout << empty_str << endl;
@@ -300,6 +297,50 @@ void testGabor(){
     FeatureFuncs::board2csv( output_copy, MAX_EMPTY, DIMENSION, "game112_feat1_edges.csv" );
 }
 
+void pointMultBenchmark(){
+    //19*19*31*31*10*361
+    //const int size = 1252384810;
+    const int size=    100000000;
+    float* naive_a = new float[size];
+    float* naive_b = new float[size];
+    float* interleaved = new float[2*size];
+
+    for( int i=0; i<size; ++i ){
+        naive_a[i] = .4;
+        naive_b[i] = .33;
+    }
+    for( int i=0; i<2*size; i+=2 ){
+        interleaved[i] = .4;
+        interleaved[i+1] = .33;
+    }
+
+    clock_t s = clock();
+    float n = FeatureFuncs::naivePointMult( naive_a, naive_b, size );
+    clock_t e = clock();
+    cout << "Naive: " << ((float) (e-s)) / CLOCKS_PER_SEC << endl;
+    cout << "results: " << n << endl;
+
+    s = clock();
+    float i = FeatureFuncs::interleavedPointMult( interleaved, size );
+    e = clock();
+    cout << "Interleaved: " << ((float) (e-s)) / CLOCKS_PER_SEC << endl;
+    cout << "results: " << i << endl;
+
+}
+
+void crossCorrelateTest(){
+    int binary_features[ NFEATURES*MAX_EMPTY ];
+    fill_n( binary_features, NFEATURES*MAX_EMPTY, 1 );
+
+    float convolved_features[ NCONVOLUTIONS*NFEATURES*MAX_EMPTY];
+    fill_n( convolved_features, NCONVOLUTIONS*NFEATURES*MAX_EMPTY, .5 );
+
+    float results[ NFEATURES*NFEATURES*NCONVOLUTIONS ] = {0};
+    FeatureFuncs::crossCorrelate( binary_features, convolved_features, results );
+    cout << "bf[0]: " << binary_features[0];
+    cout << "results[0]: " << results[0] << endl;
+}
+
 int main(){
     srand(time(0));
     cout << sizeof(GoState) << endl;
@@ -307,6 +348,7 @@ int main(){
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
+    //crossCorrelateTest();
     testValuePolicy();
     //testDefaultPolicy();
     //playGame();
@@ -317,6 +359,8 @@ int main(){
     //testConvolution();
     
     //testGabor();
+    //
+    //pointMultBenchmark();
    
     //value2Terminate();
     //mclTerminateApplication();

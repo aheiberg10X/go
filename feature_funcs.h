@@ -18,17 +18,66 @@
 
 class FeatureFuncs {
 public :
+
+
+    //some benchmarking to determine how best to do the point-wise mult 
+    // and addition
+    // [1,2,3,4] .* [5,6,7,8]
+    // vs
+    // [1,5,2,6,3,7,4,8] and timesing adjacent elements together.
+    // full scale interleaving is faster (about 2x) but will incur
+    // extra overhead to get arrays into the correct form
+    // additionally, it will necessitate un-modulating the code a bit,
+    // as they will all need to update the same giant array
+    // also, the giant array will be giant, a big use of memory
+    // 19x19x2 for each feature pair, 31x31 pairs, x4-9 convolved features 
+    // = 2775368 - 6244578 floats = 4 bytes = 8,326,104 - 18,733,734 ~8MB-19MB
+    //
+    // wait yeah this overhead will be big.  can't put things in the right 
+    // spot right away.  for gaussian have to take features array as is.
+    // would have to copy it, this overhead is already atleast the price of 
+    // the naive way, 
+    //
+    // GPU will work, but won't be able to move it to the cluster
+    // also if doing root parallelization, or multiple games in parallel,
+    // only one can use GPU at a time.  So really not doing much overall,
+    // especially given additional complexity and programmer overhead
+    //
+    // like always, let's start with naive, non-interleaved solution
+    // and go from there.
+    static float naivePointMult( float* a, float* b, int size );
+    static float interleavedPointMult( float* a, int size );
+
+
     //take a GoState and fill the 'features' array.
     //The features array represenets 'nfeatures' DIMENSIONxDIMENSION boards
     //It is layed out linearly in row-major order (use featureIX to help
     //w/ indexing)
-    static void setBinaryFeatures( GoState* gs, int* features, int nfeatures);
+    static void setBinaryFeatures( GoState* gs, int* features );
 
 
     //input_board and output_board both represent DIM x DIM boards.
     //Marks the positions in output_board that are edges in input_board
     //TODO: tweak to be float* -> float*
-    static void setEdges( int* input_board, int* output_board );
+    static void setEdges( int* input_board, float* output_board );
+
+    //cross-correlate binary features with convolved features 
+    //  binary_features:  
+    //      [binary feat 0], [binary feat 2] ... nfeatures
+    //       \           /
+    //    DIMENSION x DIMENSION
+    //          
+    //  convolved features:
+    //  [
+    //    [convolved 1 feat 1], [convolved 1 feat 2], ... nfeatures
+    //    [convolved 2 feat 1], [convolved 2 feat 2], ... nfeatures
+    //    ...
+    //    n_convolutions
+    //  ]
+    //results array should be nfeatures * nfeatures * nconvolutions
+    static void crossCorrelate( int* binary_features, 
+                                float* convolved_features, 
+                                float* results ); 
 
     //helper for gaussian kernling
     static void board2csv( float* board, int size, int width, string filename );
@@ -58,6 +107,8 @@ private :
     
 
     static int getSide( int ix );
+
+
 };
 
 

@@ -244,45 +244,47 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                               MCTS_State* state ){
 
-    const int nfeatures = 31;
-    const int features_size = nfeatures*MAX_EMPTY;
+    const int features_size = NFEATURES*MAX_EMPTY;
     int features[ features_size ] = {0};
     GoState* gs = (GoState*) state;
-    FeatureFuncs::setBinaryFeatures( gs, features, nfeatures );
+    FeatureFuncs::setBinaryFeatures( gs, features );
+
+    float convolutions[ NCONVOLUTIONS * features_size ];
 
     //gaussian convolution
     int num_steps = 2;
 
     float local_sigma = .5;
-    float local_gaussian[ features_size ];
-    //memcpy( local_gaussian, features, sizeof(int)*features_size );
-    copy( features, features + features_size, local_gaussian );
+    copy( features, features + features_size, convolutions );
     
     float meso_sigma = 1;
-    float meso_gaussian[ features_size ];
-    //memcpy( meso_gaussian, features, sizeof(int)*featuress_size
-    copy( features, features + features_size, meso_gaussian );
+    copy( features, features + features_size, &convolutions[ 1*features_size] );
 
-    int edges[ features_size ];
-    memcpy( edges, features, sizeof(int)*features_size );
+    //memcpy( &convolutions[2*features_size], features, sizeof(int)*features_size );
 
-    for( int f=0; f<nfeatures; ++f ){
-        gaussianiir2d( &local_gaussian[f*MAX_EMPTY], 
+    for( int f=0; f<NFEATURES; ++f ){
+        int feat_offset = f*MAX_EMPTY;
+        gaussianiir2d( &convolutions[0 + feat_offset],
                        DIMENSION, DIMENSION, 
                        local_sigma, 
                        num_steps );
 
-        gaussianiir2d( &meso_gaussian[f*MAX_EMPTY], 
+        gaussianiir2d( &convolutions[1*features_size + feat_offset],
                        DIMENSION, DIMENSION, 
                        meso_sigma, 
                        num_steps );
 
-        FeatureFuncs::setEdges( &features[f*MAX_EMPTY], &edges[f*MAX_EMPTY] );
-        
+        FeatureFuncs::setEdges( &features[feat_offset],
+                                &convolutions[2*features_size + feat_offset] ); 
     }
 
     //cross-correlation
+    float cc_values[ NFEATURES * NFEATURES * NCONVOLUTIONS ];
+    FeatureFuncs::crossCorrelate( features, 
+                                  convolutions,
+                                  cc_values );
 }
+
 
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
                                MCTS_State*     state ){
