@@ -6,6 +6,7 @@
 
 using namespace std;
 
+//a virtual class defining the methods mcts.h will require to work
 class MCTS_State {
 public :
     virtual const int getNumPlayers() = 0;

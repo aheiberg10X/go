@@ -7,7 +7,7 @@
 //   FeatureFuncs params
 //   ////////////////////////
 #define NFEATURES 30
-#define NCONVOLUTIONS 3 
+#define NCONVOLUTIONS 2 
 
 //Use the GPU? Moved on a l0ong time ago...
 /*#define USE_GPU false*/

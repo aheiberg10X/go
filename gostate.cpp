@@ -405,18 +405,6 @@ void GoState::capture(){
         int ix = *it;
         setBoard( ix, EMPTY );
     }
-
-    ////was the way to capture using the bitmask, 
-    ////before the marked_group vector was introduced
-    //int nSet = 0;
-    //int ix = 0;
-    //while( nSet < bm->count ){
-    //if( bm->get(ix) ){ 
-    //setBoard( ix, EMPTY );
-    //nSet++;
-    //}
-    //ix++;
-    //}
 }
 
 bool GoState::isBorder( int ix ){

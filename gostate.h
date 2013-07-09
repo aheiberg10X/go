@@ -44,12 +44,7 @@ private :
     /*int past_actions[NUM_PAST_STATES];*/
     int past_action;
 
-    //scratch space for floodFill
-    //TODO
-    //save space by treating this as char array. Numbers [0,121] < 2^8
-    //alternatively, save it as a BitMask, and iterate through each time to 
-    //get the marked elements
-    /*int floodfill_array[BOARDSIZE];*/
+    //work space for floodFill (hold over from GPU, memory tight days)
     int neighbor_array[8];
     int internal_neighbor_array[8];
     int filtered_array[8];

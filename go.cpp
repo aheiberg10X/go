@@ -98,8 +98,8 @@ void playGame(/*params for treePolicy configuration*/){
         //do parallel tree search
         //pass in the search tree, sans estimates, from laste iteration?
         #pragma omp parallel for shared(states, search_trees) \
-                                 private(tid) \
-                                 num_threads(N_ROOT_THREADS)
+        private(tid) \
+        num_threads(N_ROOT_THREADS)
         for( tid=0; tid<N_ROOT_THREADS; tid++){
             search_trees[tid] = mcts.search( states[tid] );
         }
@@ -191,7 +191,7 @@ void testManhattanDist(){
 }
 
 void testSetBinaryFeatures(){
-    int features[ NFEATURES * MAX_EMPTY ] = {0};
+    float features[ NFEATURES * MAX_EMPTY ] = {0};
 
     ZobristHash* zh = new ZobristHash;
     zh->ctor();
@@ -225,7 +225,7 @@ void timeSetBinaryFeatures(){
     gss->MATLAB2board( game1234 );
     cout << gss->toString() << endl;
 
-    int features[ NFEATURES * MAX_EMPTY ] = {0};
+    float features[ NFEATURES * MAX_EMPTY ] = {0};
     float features_copy[NFEATURES * MAX_EMPTY];
 
     for( int i=0; i<10000; ++i ){
@@ -273,7 +273,7 @@ void testGabor(){
     //gss.MATLAB2board( game1234 );
     cout << gss.toString() << endl;
 
-    int features[ NFEATURES * MAX_EMPTY ] = {0};
+    float features[ NFEATURES * MAX_EMPTY ] = {0};
     FeatureFuncs::setBinaryFeatures( &gss, features );
 
     int feat = 1;
@@ -329,7 +329,7 @@ void pointMultBenchmark(){
 }
 
 void crossCorrelateTest(){
-    int binary_features[ NFEATURES*MAX_EMPTY ];
+    float binary_features[ NFEATURES*MAX_EMPTY ];
     fill_n( binary_features, NFEATURES*MAX_EMPTY, 1 );
 
     float convolved_features[ NCONVOLUTIONS*NFEATURES*MAX_EMPTY];
@@ -341,17 +341,99 @@ void crossCorrelateTest(){
     cout << "results[0]: " << results[0] << endl;
 }
 
+void valarraySandbox(){
+    const int size = 50000;
+    float one[size]; // = {1.1,2.2,3.3,4.4,5.5};
+    float two[size]; // = {5.5,4.4,3.3,2.2,1.1};
+    fill_n( one, size, .33 );
+    fill_n( two, size, .44 );
+
+    clock_t t1,t2;
+
+    t1 = clock();
+    float sum;
+    for( int r=0; r<1000; ++r ){
+        sum = 0;
+        for(int i=0; i<size; ++i){
+            sum += one[i] * two[i];
+        }
+
+    }
+    t2 = clock();
+    cout << "sum = " << sum << endl;
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+    t1 = clock();
+    for( int r=0; r<1000; ++r ){
+        valarray<float> vone(one,size);
+        valarray<float> vtwo(two,size);
+        vone *= vtwo;
+        sum = vone.sum();
+    }
+    t2 = clock();
+    cout << "sum = " << sum << endl;
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+
+    //for( int i=0; i<size; ++i ){
+    //cout << i << ": " <<  vone[i] << endl;
+    //}
+}
+
+void gslSandbox(){
+    const int size = 50000;
+    float one[size]; // = {1.1,2.2,3.3,4.4,5.5};
+    float two[size]; // = {5.5,4.4,3.3,2.2,1.1};
+    fill_n( one, size, .33 );
+    fill_n( two, size, .44 );
+
+    gsl_vector* gv1 = gsl_vector_alloc( size );
+    gsl_vector* gv2 = gsl_vector_alloc( size );
+    for(int i=0; i<size; ++i ){
+        gsl_vector_set( gv1, i, one[i] );    
+        gsl_vector_set( gv2, i, two[i] );    
+    }
+    
+    clock_t t1,t2;
+
+    t1 = clock();
+    float sum;
+    for( int r=0; r<10000; ++r ){
+        sum = 0;
+        for(int i=0; i<size; ++i){
+            sum += one[i] * two[i];
+        }
+
+    }
+    t2 = clock();
+    cout << "sum = " << sum << endl;
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+    t1 = clock();
+    for( int r=0; r<10000; ++r ){
+        gsl_vector_mul( gv1, gv2 ); 
+    }
+    t2 = clock();
+    cout << "time taken: " << ((float) (t2-t1)) / CLOCKS_PER_SEC << endl;
+
+
+}
+
 int main(){
     srand(time(0));
     cout << sizeof(GoState) << endl;
+
+    //valarraySandbox();
+    //gslSandbox();
+    //pointMultBenchmark();
     
     //mclInitializeApplication(NULL,0);
     //value2Initialize();
 
     //crossCorrelateTest();
-    testValuePolicy();
+    //testValuePolicy();
     //testDefaultPolicy();
-    //playGame();
+    playGame();
     //testManhattanDist();
     //testSetBinaryFeatures();
     //timeSetBinaryFeatures();
@@ -360,7 +442,6 @@ int main(){
     
     //testGabor();
     //
-    //pointMultBenchmark();
    
     //value2Terminate();
     //mclTerminateApplication();

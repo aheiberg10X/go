@@ -1,5 +1,50 @@
 #include "feature_funcs.h"
 
+float FeatureFuncs::evaluateState( GoState* gs ){
+    const int features_size = NFEATURES*MAX_EMPTY;
+    float features[ features_size ] = {0};
+    
+    FeatureFuncs::setBinaryFeatures( gs, features );
+
+    float convolutions[ NCONVOLUTIONS * features_size ];
+
+    //gaussian convolution
+    int num_steps = 2;
+
+    //gaussianiir2d works in place, so copy features to convolution array
+    //copy() does the int->float automatically
+    //float local_sigma = .5;
+    //copy( features, features + features_size, convolutions );
+    
+    float meso_sigma = 1;
+    //copy( features, features + features_size, &convolutions[ 1*features_size] );
+    copy( features, features + features_size, convolutions );
+
+    for( int f=0; f<NFEATURES; ++f ){
+        int feat_offset = f*MAX_EMPTY;
+        //gaussianiir2d( &convolutions[0*features_size + feat_offset],
+        //DIMENSION, DIMENSION, 
+        //local_sigma, 
+        //num_steps );
+
+        gaussianiir2d( &convolutions[0*features_size + feat_offset],
+                       DIMENSION, DIMENSION, 
+                       meso_sigma, 
+                       num_steps );
+
+        FeatureFuncs::setEdges( &features[feat_offset],
+                                &convolutions[1*features_size + feat_offset] ); 
+    }
+
+    //cross-correlation
+    float cc_values[ NFEATURES * NFEATURES * NCONVOLUTIONS ];
+    FeatureFuncs::crossCorrelate( features, 
+                                  convolutions,
+                                  cc_values );
+
+    return 42;
+}
+
 
 //some experimenting
 float FeatureFuncs::naivePointMult( float* a, float* b, int size ){
@@ -14,34 +59,48 @@ float FeatureFuncs::interleavedPointMult( float* a, int size ){
     float sum = 0;
     for( int i=0; i<size; i+=2 ){
         sum += a[i]*a[i+1];
-        //cout << a[i] << " , " << a[i+1] << " , " << a[i]*a[i+1] << endl;
-        //cout << "m: " << sum << endl;
     }
     return sum;
 }
 
-void FeatureFuncs::crossCorrelate( int* binary_features,
+
+// binary_features size: NFEATURES * MAX_EMPTY
+// convolved_features size: NCONVOLUTIONS * NFEATURES * MAX_EMPTY
+// results: [(bf1,conv1,cf1), (bf1,conv1,cf2), ..., (bf1,conv2,cf1), ... ]
+void FeatureFuncs::crossCorrelate( float* binary_features,
                                    float* convolved_features, 
                                    float* results ){
 
     for( int i=0; i<NFEATURES; ++i ){
         int binary_offset = i * MAX_EMPTY;
-        //cout << "binary_offset: " << binary_offset << endl;
+        //SLOWER
+        //valarray<float> bf( &binary_features[binary_offset], 
+        //MAX_EMPTY );
+
         for( int j=0; j<NCONVOLUTIONS; ++j ){
             int rough_convolved_offset = j * NFEATURES * MAX_EMPTY;
-            //cout << "rough: " << rough_convolved_offset << endl;
+
             for( int k=0; k<NFEATURES; ++k ){
                 int convolved_offset = rough_convolved_offset + k * MAX_EMPTY; 
-                //cout << "conv_offset: " << convolved_offset << endl;
+                //SLOWER....
+                //valarray<float> cf( &convolved_features[convolved_offset],
+                //MAX_EMPTY );
+                //cf *= bf;
+                //int sum = cf.sum();
+
                 //inner
                 float sum = 0;
-                for(int l=0; l<MAX_EMPTY; ++l ){
-                    int b = binary_features[ binary_offset + l ];
-                    float c = convolved_features[ convolved_offset + l ];
-                    sum += b*c;
+                for(int l = binary_offset; 
+                        l < binary_offset+MAX_EMPTY; 
+                        ++l ){
+                    float b = binary_features[ l ];
+                    b *= convolved_features[ l ];
+                    sum += b;
                 }
+
                 //put sum in results
-                int rix = (i*NFEATURES*NCONVOLUTIONS) + (j*NFEATURES) + (k);
+                int rix = (i*NCONVOLUTIONS*NFEATURES) + (j*NFEATURES) + (k);
+
                 //cout << "sum: " << sum << " to results ix: " << rix << endl;
                 results[rix] = sum;
             }
@@ -60,7 +119,7 @@ int FeatureFuncs::featureIX( int feature, int ix ){
     }
 }
 
-void FeatureFuncs::setBinaryFeatures( GoState* gs, int* features ){
+void FeatureFuncs::setBinaryFeatures( GoState* gs, float* features ){
     //the group numbers for every intersection.  -1 for offboards and empties
     int group_id = 0;
     int group_assignments[BOARDSIZE];
@@ -265,6 +324,7 @@ void FeatureFuncs::board2csv( float* board, int size, int width, string filename
 
 //no OFFBOARD buffer here
 //this is absolutely horrendous code
+//please dont look at it
 void FeatureFuncs::neighborValues( int* to_fill, int* board, int ix ){
     int side = getSide( ix );
     //neighborsOf( neighbor_array, ix, ADJACENCY );
@@ -412,7 +472,13 @@ bool FeatureFuncs::matchesPattern( int* neighbors, int* pattern ){
     return n_one_matches == 2 && n_zero_matches == n_pattern_zeros;
 }
 
-void FeatureFuncs::setEdges( int* input_board, float* output_board ){
+void FeatureFuncs::setEdges( float* float_input_board, float* output_board ){
+    //TODO: 
+    // Change all functions to accept float* input 
+    // For now just converting from float to int 
+    int input_board[MAX_EMPTY] = {0};
+    copy( float_input_board, float_input_board + MAX_EMPTY, input_board );
+
     for( int ix=0; ix<MAX_EMPTY; ++ix ){
         output_board[ix] = 0;
         if( input_board[ix] == 1 ){ //&& ! isBorderGabor(ix) ){
@@ -462,41 +528,6 @@ void FeatureFuncs::setEdges( int* input_board, float* output_board ){
                     break;
                 }
             }
-
-
-            //for( int i=0; i<ADJACENCY; ++i ){
-            //cout << nvalues[i] << ",";
-            //}
-            //cout << endl;
-
-            //neighborsOf(ix)
-            //map this array to their colors
-            //iterate through all the neighbor patterns
-            //1 * *
-            //0 1 *  ->  [42 0 42 0 1 42 0 1]
-            //0 0 1a
-            //neighborsOf returns neighbs in this order:
-            //N,S,E,W,NW,NE,SW,SE
-            //*'s mean don't care, 1's and 0's must match between
-            //template and neighbors
-            //for each neighbor pattern, sum the # of matching 1,0's
-            //if num matching 1's = total # of 1's
-            //and num matching 0's >= total # of 0's - 1
-            //then we say ix is a edge point.
-            //Can break from template iteration matching
-
-
-            //if( inVerticalEdge( input_board, ix ) ){
-            //output_board[ix] = 1;
-            //continue;
-            //}
-            //else if( inHorizontalEdge( input_board, ix ) ){
-            //output_board[ix] = 1;
-            //continue;
-            //}
-            //
-            //}
-            //output_board[ix] = 0;
         }
     }
 }
@@ -539,14 +570,12 @@ pair<int,int> FeatureFuncs::getManhattanDistPair( GoState* gs, int ix ){
                 char spiral_color = gs->ix2color(spiral_head);
                 if( spiral_color == frend_color ){
                     frend_dist = radius + abs(step - min_dist_step);
-                    //cout << "frend_dist: " << frend_dist << endl;
                     frend_found = true;
                     if( foe_found ) break;
 
                 }
                 else if( spiral_color == foe_color ){
                     foe_dist = radius + abs(step - min_dist_step);
-                    //cout << "foe_dist: " << foe_dist << endl;
                     foe_found = true;
                     if( frend_found ) break;
                 }
@@ -599,104 +628,3 @@ int FeatureFuncs::getSide( int ix ){
     else{ return 0; }
 }
 
-
-
-
-///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
-
-/*
-bool FeatureFuncs::inVerticalEdge( int* input_board, int ix ){
-    int side = getSide(ix);
-    if( side == 1 || side == 4 ){ 
-        //if stone on top or bottom, can't have its top and bottom 
-        //neighbs both be one
-        return false; }
-
-    int north = input_board[ix-DIMENSION];
-    int south = input_board[ix+DIMENSION];
-    if( north==1 && south==1 ){
-        cout << "up down == 1" << endl;
-        int sum = 0;
-        if( side == 2 ){
-            //left side is off board
-        }
-        else {
-            //left side empty
-            int nw = input_board[ix-DIMENSION-1] == 0;
-            int w = input_board[ix-1] == 0;
-            int sw = input_board[ix+DIMENSION-1] == 0;
-            sum = nw+w+sw;
-            cout << "left sum: " << sum << endl;
-        }
-
-        if( sum >= 2 ){
-            return true;
-        }
-        else{
-            if( side == 3 ){
-                //right side is off board
-                return false;
-            }
-            else {
-                int ne = input_board[ix-DIMENSION+1] == 0;
-                int e = input_board[ix+1] == 0;
-                int se = input_board[ix+DIMENSION+1] == 0;
-                sum = ne+e+se;
-                cout << "right sum: " << sum << endl;
-                if( sum >= 2 ){
-                    return true;
-                }
-            }
-        }
-    }
-    cout << "ret false: " << endl;
-    return false;
-}
-
-bool FeatureFuncs::inHorizontalEdge( int* input_board, int ix ){
-    int side = getSide(ix);
-    cout << "side : " << side << endl;
-    if( side == 2 || side == 3 ){ 
-        return false; }
-
-    int east = input_board[ix+1];
-    int west = input_board[ix-1];
-    if( east==1 && west==1 ){
-        cout << "east west 1 1" << endl;
-        int sum = 0;
-
-        if( side == 1 ){
-        }
-        else {
-            //north side empty
-            int nw = input_board[ix-DIMENSION-1] == 0;
-            int n = input_board[ix-DIMENSION] == 0;
-            int ne = input_board[ix-DIMENSION+1] == 0;
-            sum = nw+n+ne;
-        }
-        cout << "north sum: " << sum << endl;
-        if( sum >= 2 ){
-            return true;
-        }
-        else{
-            if( side == 4 ){
-                return false;
-            }
-            else {
-                int sw = input_board[ix+DIMENSION-1] == 0;
-                int s = input_board[ix+DIMENSION] == 0;
-                int se = input_board[ix+DIMENSION+1] == 0;
-                sum = sw+s+se;
-                cout << "south sum: " << sum << endl;
-                if( sum >= 2 ){
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-*/

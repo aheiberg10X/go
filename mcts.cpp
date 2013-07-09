@@ -1,25 +1,8 @@
-#include <assert.h>
-#include <iostream>
-#include <math.h>
-#include <vector>
-#include "matrix.h"
-#include <time.h>
-
 #include "mcts.h"
 
 //break in abstraction for valuePolicy 
 #include "gostate.h"
-#include "weights.h"
-#include "value_functions/value2.h"
 
-#include "gaussian/gaussianiir2d.h"
-#include "feature_funcs.h"
-
-
-using namespace std;
-
-//perform NUM_ITERATIONS iterations of the 4-step MCTS algorithm
-//returns the search_tree, rooted at root_node
 MCTS_Node* MCTS::search( MCTS_State* root_state ){
     
     int num_players = root_state->getNumPlayers();
@@ -33,15 +16,16 @@ MCTS_Node* MCTS::search( MCTS_State* root_state ){
     MCTS_Node* node;
 
     int rewards[num_players];
+    for( int i=0; i<num_players; ++i ) rewards[i] = 0;
 
     int iterations = 0;
 
-    clock_t tree_policy_time, simulation_time;
     clock_t t1,t2;
     t1 = clock();
-
     while( iterations < NUM_ITERATIONS ){
+        //restore state
         root_state->copyInto( state );
+
         cout << endl << endl << "iteration: " << iterations << endl;
         //cout << "\n\nroot state: " << state->toString() << endl;
 
@@ -70,18 +54,20 @@ MCTS_Node* MCTS::search( MCTS_State* root_state ){
 MCTS_Node* MCTS::treePolicy( MCTS_Node* node, 
                              MCTS_State*     state ){
 
-    //return randomPolicy( node, state );
+    return randomPolicy( node, state );
 
     //the following makes BLACK BLACK uses valueFucntion
     int player = state->getPlayerIx();
     if( player == 1 ){
-        return valuePolicy( node, state );
+        cout << "valuePolicy not working yet" << endl;
+        //return valuePolicy( node, state );
     }
     else{
         return randomPolicy( node, state );
     }
 }
 
+/*
 //value function approach to the treePolicy
 //currently using fred's MATLAB impl
 MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node, 
@@ -120,6 +106,9 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
         float action_values[BOARDSIZE];
 
         int ta = clock();
+        //this parallelization doesn't work, MATLAB libraries not thread
+        //safe and crash horribly.  This is deprecated now in favor of 
+        //valuePolicy()
         #pragma omp parallel for shared(action_values, gss, working_gss ) \
                                  num_threads(N_VALUE_THREADS)
         for( int action=0; action<BOARDSIZE; action++ ){
@@ -174,7 +163,7 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
                 }
             }
             action_values[action] = value;
-        }//for action
+        }//zafor action
         
 
         //segregate the legal and maximum value moves
@@ -230,7 +219,7 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
         node = node->children[chosen_action];
         //cout << "new node: " << node << " marked: " << node->marked << endl;
         //cout << "hit any key" << endl;
-        //cin.ignore();*/
+        //cin.ignore();
     }//while not terminal
 
     mxDestroyArray(V);
@@ -240,51 +229,30 @@ MCTS_Node* MCTS::valuePolicyMATLAB( MCTS_Node* node,
     return node;
 }
 
+*/
+
 //breaking abstraction, get over it
 MCTS_Node* MCTS::valuePolicy( MCTS_Node* node,
                               MCTS_State* state ){
 
-    const int features_size = NFEATURES*MAX_EMPTY;
-    int features[ features_size ] = {0};
-    GoState* gs = (GoState*) state;
-    FeatureFuncs::setBinaryFeatures( gs, features );
+    //first of all, check if child values have already been computed
+    //if not, proceed as below
+    //while( node->marked && !state->isTerminal() ){
+        //float action_values[BOARDSIZE];
+        //for( int action=0; action<BOARDSIZE; action++ ){
+            ////if have a value already
+            //if( node->tried_actions->get(action) ){
+                //value = node->children[action]->value;
+            //}
+            //else{
+                //.....
+    float value = FeatureFuncs::evaluateState( (GoState*) state );
 
-    float convolutions[ NCONVOLUTIONS * features_size ];
-
-    //gaussian convolution
-    int num_steps = 2;
-
-    float local_sigma = .5;
-    copy( features, features + features_size, convolutions );
-    
-    float meso_sigma = 1;
-    copy( features, features + features_size, &convolutions[ 1*features_size] );
-
-    //memcpy( &convolutions[2*features_size], features, sizeof(int)*features_size );
-
-    for( int f=0; f<NFEATURES; ++f ){
-        int feat_offset = f*MAX_EMPTY;
-        gaussianiir2d( &convolutions[0 + feat_offset],
-                       DIMENSION, DIMENSION, 
-                       local_sigma, 
-                       num_steps );
-
-        gaussianiir2d( &convolutions[1*features_size + feat_offset],
-                       DIMENSION, DIMENSION, 
-                       meso_sigma, 
-                       num_steps );
-
-        FeatureFuncs::setEdges( &features[feat_offset],
-                                &convolutions[2*features_size + feat_offset] ); 
-    }
-
-    //cross-correlation
-    float cc_values[ NFEATURES * NFEATURES * NCONVOLUTIONS ];
-    FeatureFuncs::crossCorrelate( features, 
-                                  convolutions,
-                                  cc_values );
+        //do something with cc_values
+    //pick a child for expansion, via greedy or something else
+    //if this action already has a node is already expanded, return it
+    //if not, create a new node
 }
-
 
 MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
                                MCTS_State*     state ){
@@ -295,9 +263,11 @@ MCTS_Node* MCTS::randomPolicy( MCTS_Node* root_node,
 
     while( node->marked && !state->isTerminal() ){
         action = state->randomAction( &empty_to_exclude, true );
+        //if this action has been tried before, use it
         if( node->tried_actions->get(action) ){
             node = node->children[action];
         }
+        //else create a new node
         else{
             node = new MCTS_Node( node, action );
         }
@@ -423,6 +393,7 @@ void MCTS::defaultPolicy( int* total_rewards,
         scratch_state->getRewards( rewards );
         for( int p=0; p<nplayers; ++p ){
             total_rewards[p] += rewards[p];
+            //cout << "total rewards " << p << " " << total_rewards[p] <<endl;
         }
     }
     delete scratch_state;
@@ -435,10 +406,10 @@ void MCTS::backprop( MCTS_Node* node,
     while( !node->is_root ){
         node->visit_count++;
         for( int i=0; i < num_players; i++ ){
-            //cout << "rewardSSS: " << node->total_rewards[i] << endl;
             node->total_rewards[i] += rewards[i];
         }
         node = node->parent;
+        break;
     }
     return;
 }

@@ -1,10 +1,5 @@
-#include <iostream>
 #include "mcts_node.h"
 
-#include <stdlib.h>
-using namespace std;
-
-//for initializing the root node
 MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     //incCreated();
     num_players = anum_players;
@@ -21,7 +16,6 @@ MCTS_Node::MCTS_Node(int anum_players, int anum_actions){
     }
 }
 
-//for initializing non-root nodes
 MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     //incCreated();
     is_root = false;
@@ -49,19 +43,6 @@ MCTS_Node::MCTS_Node( MCTS_Node* aparent, int aaction ){
     value = 0;
 }
 
-/*
-int MCTS_Node::num_nodes_created = 0;
-int MCTS_Node::num_nodes_destroyed = 0;
-
-void MCTS_Node::incCreated(){
-    num_nodes_created++;
-}
-
-void MCTS_Node::incDestroyed(){
-    num_nodes_destroyed++;
-}
-*/
-    
 MCTS_Node::~MCTS_Node(){
     //incDestroyed();
     delete[] total_rewards;

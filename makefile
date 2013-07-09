@@ -1,4 +1,4 @@
-CFLAGS= -pg #-O3 -fopenmp
+CFLAGS= -O3 -funroll-loops -fopenmp
 INC = #-I/usr/local/cuda/include
 LINKS = #-L/usr/local/cuda/lib64 -lcuda -lcudart
 CMPLR=/usr/bin/g++-4.4 
@@ -15,8 +15,10 @@ cross_corr:
 
 shared: kernel.o mcts.o go.o gaussian.o feature_funcs.o
 	${CMPLR} -o kernel feature_funcs.o queue.o bitmask.o gostate.o zobrist.o mcts.o mcts_node.o go.o gaussianiir2d.o ${CFLAGS} \
-	-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
-	-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut	
+	-L/usr/local/lib -lgsl -lgslcblas
+
+	#-L/Volumes/export/isn/andrew/go/value_functions -lvalue2 \
+	#-L/usr/local/MATLAB/R2011b/bin/glnxa64 -lmx -leng -lmat -lut \
 
 feature_funcs.o :
 	${CMPLR} -c feature_funcs.cpp ${CFLAGS}
@@ -37,7 +39,9 @@ gaussian.o :
 
 go.o:
 	${CMPLR} -c go.cpp ${INC} ${CFLAGS} \
-	-I/usr/local/MATLAB/R2011b/extern/include/ 
+	-I/usr/local/MATLAB/R2011b/extern/include/ \
+	-I/usr/local/include
+
 
 ######################################################################
 
